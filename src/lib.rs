@@ -34,6 +34,8 @@ pub const APP_LOADER_BIND_PORT_START: u16 = 3031;
 pub const KEEP_APP_LOADER_START_COMMAND: &str = "apploader-start";
 pub const KEEP_APP_LOADER_ADDR: &str = "apploader-addr";
 pub const KEEP_APP_LOADER_PORT: &str = "apploader-port";
+pub const KEEP_BACKEND_SET: &str = "keep-backend-set";
+pub const KEEP_TYPE_INFO_COMMAND: &str = "keep-path-info";
 
 pub type KeepLoaderList = Arc<Mutex<Vec<KeepLoader>>>;
 

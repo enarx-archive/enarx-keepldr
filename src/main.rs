@@ -97,35 +97,49 @@ struct Exec {
     code: PathBuf,
 }
 
+/// Sets up the keeploader as a daemon, to listen on a Unix socket
+#[derive(StructOpt)]
+struct Daemon {
+    /// The kuuid to run on
+    kuuid: String,
+}
+
 #[derive(StructOpt)]
 #[structopt(version=VERSION, author=AUTHORS.split(";").nth(0).unwrap())]
 enum Options {
     Info(Info),
     Exec(Exec),
+    Daemon(Daemon),
 }
 
-//fn main() -> Result<()> {
-fn main() {
-    let backends: &[Box<dyn Backend>] = &[
-        Box::new(backend::sev::Backend),
-        Box::new(backend::sgx::Backend),
-        Box::new(backend::kvm::Backend),
-    ];
-
+fn main() -> Result<()> {
     println!("Welcome to a new keep-loader");
 
-    //get and parse args
-    let args: Vec<String> = std::env::args().collect();
+    //take the ENARX_BACKEND environment variable if available
+    let mut backend_type: String;
+    match std::env::var_os("ENARX_BACKEND").map(|x| x.into_string().unwrap()) {
+        Some(b) => backend_type = b,
+        None => backend_type = String::from("nil"),
+    }
+
+    match Options::from_args() {
+        // we don't need the backends at this point for our Daemon,
+        //  and generating a threadsafe version is overkill
+        Options::Info(_) => info(generate_backends()),
+        Options::Exec(e) => exec(generate_backends(), backend_type, e),
+        Options::Daemon(d) => daemon(d, backend_type),
+    }
+}
+
+fn daemon(opts: Daemon, backend_type: String) -> Result<()> {
     //bind to unix socket
     //await commands
-    //TODO - remove hard-coding!
-    println!("Keep-loader has received {} args", args.len());
-    let kuuid = args[1].clone();
+    let kuuid = opts.kuuid.clone();
     println!("kuuid = {}", kuuid);
     let bind_socket = format!("/tmp/enarx-keep-{}.sock", kuuid);
     println!("binding to {}", bind_socket);
     let keepapploader = Arc::new(Mutex::new(build_keepapploader(
-        "".to_string(),
+        backend_type,
         KEEP_LOADER_STATE_UNDEF,
         kuuid.parse().expect("problems parsing kuuid"),
         0,
@@ -156,12 +170,16 @@ fn main() {
             }
         }
     }
+    Ok(())
+}
 
-    /*
-    match Options::from_args() {
-        Options::Info(_) => info(backends),
-        Options::Exec(e) => exec(backends, e),
-    }*/
+fn generate_backends() -> &'static [Box<dyn Backend>] {
+    let backends: &[Box<dyn Backend>] = &[
+        Box::new(backend::sev::Backend),
+        Box::new(backend::sgx::Backend),
+        Box::new(backend::kvm::Backend),
+    ];
+    backends
 }
 
 fn info(backends: &[Box<dyn Backend>]) -> Result<()> {
@@ -196,10 +214,8 @@ fn info(backends: &[Box<dyn Backend>]) -> Result<()> {
 }
 
 #[allow(unreachable_code)]
-fn exec(backends: &[Box<dyn Backend>], opts: Exec) -> Result<()> {
-    //TODO - remove, and take this from the command passed to us
-    let keep = std::env::var_os("ENARX_BACKEND").map(|x| x.into_string().unwrap());
-
+fn exec(backends: &[Box<dyn Backend>], backend_type: String, opts: Exec) -> Result<()> {
+    let keep = backend_type;
     let backend = backends
         .iter()
         .filter(|b| keep.is_none() || keep == Some(b.name().into()))
@@ -250,9 +266,9 @@ fn build_keepapploader(
 
 fn keep_loader_connection(stream: UnixStream, keepapploader: Arc<Mutex<KeepLoader>>) {
     //the below values are very much fall-backs
-    let mut backend_type: String = String::from("nil");
     let mut app_addr: String = String::from("127.0.0.1");
     let mut app_port: u16 = APP_LOADER_BIND_PORT_START;
+    let mut backend_type: String = String::from("nil");
 
     //let mut json_pair: serde_json::value::Value;
     let mut stream = &stream;
@@ -282,27 +298,40 @@ fn keep_loader_connection(stream: UnixStream, keepapploader: Arc<Mutex<KeepLoade
                         kal.lock().unwrap().app_loader_bind_port = app_port.clone();
                     }
                     KEEP_APP_LOADER_START_COMMAND => {
-                        println!("About to spawn, listening on port {}", app_port.to_string());
-                        let child_spawn_result =
-                            std::process::Command::new(WASM_RUNTIME_BINARY_PATH)
-                                .arg(&app_addr)
-                                .arg(app_port.to_string())
-                                .spawn();
-                        match &child_spawn_result {
-                            Ok(_v) => {
-                                let state_result =
-                                    set_state(KEEP_LOADER_STATE_STARTED, kal.clone());
-                                match state_result {
-                                    Ok(_v) => println!("Spawned new runtime, set state"),
+                        match backend_type.as_str() {
+                            KEEP_ARCH_WASI => {
+                                //use local
+                                println!(
+                                    "About to spawn, listening on port {}",
+                                    app_port.to_string()
+                                );
+                                let child_spawn_result =
+                                    std::process::Command::new(WASM_RUNTIME_BINARY_PATH)
+                                        .arg(&app_addr)
+                                        .arg(app_port.to_string())
+                                        .spawn();
+                                match &child_spawn_result {
+                                    Ok(_v) => {
+                                        let state_result =
+                                            set_state(KEEP_LOADER_STATE_STARTED, kal.clone());
+                                        match state_result {
+                                            Ok(_v) => println!("Spawned new runtime, set state"),
+                                            Err(e) => println!(
+                                                "Spawned new runtime, no state set due to {}!",
+                                                e
+                                            ),
+                                        }
+                                        println!("Set state attempted");
+                                        println!("State = {}", kal.lock().unwrap().state);
+                                    }
                                     Err(e) => {
-                                        println!("Spawned new runtime, no state set due to {}!", e)
+                                        println!("Error spawning runtime {:?}", e);
                                     }
                                 }
-                                println!("Set state attempted");
-                                println!("State = {}", kal.lock().unwrap().state);
                             }
-                            Err(e) => {
-                                println!("Error spawning runtime {:?}", e);
+                            _ => {
+                                //manage all other types
+                                exec(generate_backends(), Some(backend_type), e);
                             }
                         }
                     }
@@ -321,7 +350,7 @@ fn keep_loader_connection(stream: UnixStream, keepapploader: Arc<Mutex<KeepLoade
                             .expect("failed to write");
                     }
                     KEEP_TYPE_INFO_COMMAND => {
-                        //TODO provide information from the existing todo
+                        //TODO provide information from the supported backends (see existing info function)
                     }
                     _ => println!("Unknown command received"),
                 }
