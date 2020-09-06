@@ -70,7 +70,6 @@ use std::ffi::CString;
 use std::io::Error;
 use std::os::raw::c_char;
 use std::os::unix::ffi::OsStrExt;
-use std::path::PathBuf;
 use std::ptr::null;
 
 use std::io::prelude::*;
@@ -85,17 +84,6 @@ const AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
 /// Prints information about your current platform
 #[derive(StructOpt)]
 struct Info {}
-
-/// Executes a keep
-#[derive(StructOpt)]
-struct Exec {
-    /// The socket to use for preattestation
-    #[structopt(short, long)]
-    sock: Option<PathBuf>,
-
-    /// The payload to run inside the keep
-    code: PathBuf,
-}
 
 /// Sets up the keeploader as a daemon, to listen on a Unix socket
 #[derive(StructOpt)]
@@ -126,7 +114,7 @@ fn main() -> Result<()> {
         // we don't need the backends at this point for our Daemon,
         //  and generating a threadsafe version is overkill
         Options::Info(_) => info(generate_backends()),
-        Options::Exec(e) => exec(generate_backends(), backend_type, e),
+        Options::Exec(e) => exec(generate_backends(), Some(backend_type), e),
         Options::Daemon(d) => daemon(d, backend_type),
     }
 }
@@ -144,6 +132,7 @@ fn daemon(opts: Daemon, backend_type: String) -> Result<()> {
         kuuid.parse().expect("problems parsing kuuid"),
         0,
         "".to_string(),
+        None,
     )));
 
     let listener = UnixListener::bind(bind_socket).unwrap();
@@ -214,7 +203,7 @@ fn info(backends: &[Box<dyn Backend>]) -> Result<()> {
 }
 
 #[allow(unreachable_code)]
-fn exec(backends: &[Box<dyn Backend>], backend_type: String, opts: Exec) -> Result<()> {
+fn exec(backends: &[Box<dyn Backend>], backend_type: Option<String>, opts: Exec) -> Result<()> {
     let keep = backend_type;
     let backend = backends
         .iter()
@@ -254,6 +243,7 @@ fn build_keepapploader(
     kuuid: usize,
     app_loader_bind_port: u16,
     bindaddress: String,
+    exec: Option<Exec>,
 ) -> KeepLoader {
     KeepLoader {
         backend_type: backend_type,
@@ -261,6 +251,7 @@ fn build_keepapploader(
         kuuid: kuuid,
         app_loader_bind_port: app_loader_bind_port,
         bindaddress: bindaddress,
+        exec: exec,
     }
 }
 
@@ -296,6 +287,12 @@ fn keep_loader_connection(stream: UnixStream, keepapploader: Arc<Mutex<KeepLoade
                             .parse()
                             .expect("problems parsing port information");
                         kal.lock().unwrap().app_loader_bind_port = app_port.clone();
+                    }
+                    KEEP_PREATT_SOCK_COMMAND => {
+                        //todo - add parsing
+                    }
+                    KEEP_PAYLOAD_COMMAND => {
+                        //TODO - add parsing
                     }
                     KEEP_APP_LOADER_START_COMMAND => {
                         match backend_type.as_str() {

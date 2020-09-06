@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use serde_derive::{Deserialize, Serialize};
+use std::path::PathBuf;
 use std::sync::Arc;
+use structopt::StructOpt;
 use tokio::sync::Mutex;
 
 pub const WASM_RUNTIME_BINARY_PATH: &str =
@@ -36,20 +38,35 @@ pub const KEEP_APP_LOADER_ADDR: &str = "apploader-addr";
 pub const KEEP_APP_LOADER_PORT: &str = "apploader-port";
 pub const KEEP_BACKEND_SET: &str = "keep-backend-set";
 pub const KEEP_TYPE_INFO_COMMAND: &str = "keep-path-info";
+pub const KEEP_PREATT_SOCK_COMMAND: &str = "keep-preatt-sock";
+pub const KEEP_PAYLOAD_COMMAND: &str = "keep-payload";
 
 pub type KeepLoaderList = Arc<Mutex<Vec<KeepLoader>>>;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct KeepLoader {
+    //TODO - some of these might be better as options
     pub backend_type: String,
     pub state: u8,
     pub kuuid: usize,
     pub app_loader_bind_port: u16,
     pub bindaddress: String,
+    pub exec: Option<Exec>,
     //we may wish to add information here about whether we're happy to share
     // all of this information with external parties, but since the keeploader
     // is operating outside the TEE boundary, there's only so much we can do
     // to keep this information confidential
+}
+
+/// Executes a keep
+#[derive(StructOpt, Serialize, Deserialize, Clone)]
+pub struct Exec {
+    /// The socket to use for preattestation
+    #[structopt(short, long)]
+    pub sock: Option<PathBuf>,
+
+    /// The payload to run inside the keep
+    pub code: PathBuf,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
