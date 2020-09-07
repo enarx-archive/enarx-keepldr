@@ -43,7 +43,7 @@
 //!     EOF
 //!
 //!     $ musl-gcc -static-pie -fPIC -o test test.c
-//!     $ target/debug/enarx-keepldr exec ./test
+//!     $ ./target/debug/enarx-keepldr exec ./test
 //!     Hello World!
 
 #![deny(clippy::all)]
@@ -70,6 +70,7 @@ use std::ffi::CString;
 use std::io::Error;
 use std::os::raw::c_char;
 use std::os::unix::ffi::OsStrExt;
+use std::path::PathBuf;
 use std::ptr::null;
 
 use std::io::prelude::*;
@@ -103,8 +104,14 @@ enum Options {
 fn main() -> Result<()> {
     println!("Welcome to a new keep-loader");
 
+    let backends: &[Box<dyn Backend>] = &[
+        Box::new(backend::sev::Backend),
+        Box::new(backend::sgx::Backend),
+        Box::new(backend::kvm::Backend),
+    ];
+
     //take the ENARX_BACKEND environment variable if available
-    let mut backend_type: String;
+    let backend_type: String;
     match std::env::var_os("ENARX_BACKEND").map(|x| x.into_string().unwrap()) {
         Some(b) => backend_type = b,
         None => backend_type = String::from("nil"),
@@ -113,8 +120,8 @@ fn main() -> Result<()> {
     match Options::from_args() {
         // we don't need the backends at this point for our Daemon,
         //  and generating a threadsafe version is overkill
-        Options::Info(_) => info(generate_backends()),
-        Options::Exec(e) => exec(generate_backends(), Some(backend_type), e),
+        Options::Info(_) => info(backends),
+        Options::Exec(e) => exec_keep(Some(backend_type), e),
         Options::Daemon(d) => daemon(d, backend_type),
     }
 }
@@ -162,15 +169,6 @@ fn daemon(opts: Daemon, backend_type: String) -> Result<()> {
     Ok(())
 }
 
-fn generate_backends() -> &'static [Box<dyn Backend>] {
-    let backends: &[Box<dyn Backend>] = &[
-        Box::new(backend::sev::Backend),
-        Box::new(backend::sgx::Backend),
-        Box::new(backend::kvm::Backend),
-    ];
-    backends
-}
-
 fn info(backends: &[Box<dyn Backend>]) -> Result<()> {
     use colorful::*;
 
@@ -203,13 +201,17 @@ fn info(backends: &[Box<dyn Backend>]) -> Result<()> {
 }
 
 #[allow(unreachable_code)]
-fn exec(backends: &[Box<dyn Backend>], backend_type: Option<String>, opts: Exec) -> Result<()> {
+fn exec_keep(backend_type: Option<String>, opts: Exec) -> Result<()> {
+    let backends: &[Box<dyn Backend>] = &[
+        Box::new(backend::sev::Backend),
+        Box::new(backend::sgx::Backend),
+        Box::new(backend::kvm::Backend),
+    ];
     let keep = backend_type;
     let backend = backends
         .iter()
         .filter(|b| keep.is_none() || keep == Some(b.name().into()))
         .find(|b| b.have());
-
     if let Some(backend) = backend {
         let code = Component::from_path(&opts.code)?;
         let keep = backend.build(code, opts.sock.as_deref())?;
@@ -237,6 +239,13 @@ fn exec(backends: &[Box<dyn Backend>], backend_type: Option<String>, opts: Exec)
     unreachable!();
 }
 
+fn build_exec(sock: Option<PathBuf>, code: PathBuf) -> Exec {
+    Exec {
+        sock: sock,
+        code: code,
+    }
+}
+
 fn build_keepapploader(
     backend_type: String,
     state: u8,
@@ -260,6 +269,7 @@ fn keep_loader_connection(stream: UnixStream, keepapploader: Arc<Mutex<KeepLoade
     let mut app_addr: String = String::from("127.0.0.1");
     let mut app_port: u16 = APP_LOADER_BIND_PORT_START;
     let mut backend_type: String = String::from("nil");
+    let mut exec: Exec = build_exec(Some(PathBuf::new()), PathBuf::new());
 
     //let mut json_pair: serde_json::value::Value;
     let mut stream = &stream;
@@ -289,10 +299,12 @@ fn keep_loader_connection(stream: UnixStream, keepapploader: Arc<Mutex<KeepLoade
                         kal.lock().unwrap().app_loader_bind_port = app_port.clone();
                     }
                     KEEP_PREATT_SOCK_COMMAND => {
-                        //todo - add parsing
+                        exec.sock = Some(PathBuf::from(json_command.commandcontents));
+                        kal.lock().unwrap().exec = Some(exec.clone());
                     }
                     KEEP_PAYLOAD_COMMAND => {
-                        //TODO - add parsing
+                        exec.code = PathBuf::from(json_command.commandcontents);
+                        kal.lock().unwrap().exec = Some(exec.clone());
                     }
                     KEEP_APP_LOADER_START_COMMAND => {
                         match backend_type.as_str() {
@@ -328,7 +340,16 @@ fn keep_loader_connection(stream: UnixStream, keepapploader: Arc<Mutex<KeepLoade
                             }
                             _ => {
                                 //manage all other types
-                                exec(generate_backends(), Some(backend_type), e);
+                                let exec_result = exec_keep(
+                                    Some(backend_type.clone()),
+                                    kal.lock().unwrap().exec.clone().unwrap(),
+                                );
+                                match exec_result {
+                                    Ok(_) => {}
+                                    Err(e) => {
+                                        println!("Failed to execute keep, {}", e);
+                                    }
+                                }
                             }
                         }
                     }
