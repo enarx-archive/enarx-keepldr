@@ -7,7 +7,7 @@ use structopt::StructOpt;
 use tokio::sync::Mutex;
 
 pub const WASM_RUNTIME_BINARY_PATH: &str =
-    "/home/mike/programming/enarx/keep-runtime/target/x86_64-unknown-linux-musl/debug/keep-runtime";
+    "/home/mike/programming/enarx-wasmldr/target/x86_64-unknown-linux-musl/debug/enarx-wasmldr";
 pub const LOCAL_LISTEN_ADDRESS: &str = "192.168.1.202";
 
 pub const PROTO_VERSION: f32 = 0.1;
