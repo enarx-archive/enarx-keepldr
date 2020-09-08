@@ -110,7 +110,6 @@ fn main() -> Result<()> {
         Box::new(backend::sgx::Backend),
         Box::new(backend::kvm::Backend),
     ];
-    //TOHERE
 
     //take the ENARX_BACKEND environment variable if available
     let backend_type: String;
@@ -119,14 +118,10 @@ fn main() -> Result<()> {
         None => backend_type = String::from("nil"),
     }
 
-    //    let initial_keep: KeepLoader =
-    //        build_keepapploader(backend_type, KEEP_LOADER_STATE_UNDEF, 0, 0, "", e);
-
     match Options::from_args() {
         // we don't need the backends at this point for our Daemon,
         //  and generating a threadsafe version is overkill
         Options::Info(_) => info(backends),
-        //Options::Exec(e) => exec_keep(initial_keep),
         Options::Exec(e) => exec_keep(build_keepapploader(
             backend_type,
             KEEP_LOADER_STATE_UNDEF,
@@ -172,7 +167,6 @@ fn info(backends: &[Box<dyn Backend>]) -> Result<()> {
 
 #[allow(unreachable_code)]
 fn exec_keep(keeploader: KeepLoader) -> Result<()> {
-    //fn exec_keep(backend_type: Option<String>, opts: Exec) -> Result<()> {
     let backends: &[Box<dyn Backend>] = &[
         Box::new(backend::sev::Backend),
         Box::new(backend::sgx::Backend),
@@ -185,9 +179,7 @@ fn exec_keep(keeploader: KeepLoader) -> Result<()> {
         .find(|b| b.have());
     if let Some(backend) = backend {
         let exec: Exec = keeploader.exec.unwrap();
-        //        let code = Component::from_path(&opts.code)?;
         let code = Component::from_path(&exec.code)?;
-        //        let keep = backend.build(code, opts.sock.as_deref())?;
         let keep = backend.build(code, exec.sock.as_deref())?;
 
         let mut thread = keep.clone().add_thread()?;
@@ -201,7 +193,10 @@ fn exec_keep(keeploader: KeepLoader) -> Result<()> {
         }
     } else {
         match keep {
+            //TODO - some debug here
             Some(name) if name == "nil" => {
+                //TODO - or WASMTIME...
+                //TODO - use the enarx-wasmldr binary with relevant args
                 let cstr =
                     CString::new(keeploader.exec.unwrap().code.as_os_str().as_bytes()).unwrap();
                 unsafe { libc::execl(cstr.as_ptr(), cstr.as_ptr(), null::<c_char>()) };
@@ -324,6 +319,7 @@ fn keep_loader_connection(stream: UnixStream, keepapploader: Arc<Mutex<KeepLoade
                         kal.lock().unwrap().exec = Some(exec.clone());
                     }
                     KEEP_APP_LOADER_START_COMMAND => {
+                        //TODO - remove this match, make everything use exec_keep
                         match backend_type.as_str() {
                             KEEP_ARCH_WASI => {
                                 //use local
