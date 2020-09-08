@@ -103,12 +103,14 @@ enum Options {
 
 fn main() -> Result<()> {
     println!("Welcome to a new keep-loader");
-
+    //NOTE - this block is replicated in the function exec-keep, which is
+    // not optimal
     let backends: &[Box<dyn Backend>] = &[
         Box::new(backend::sev::Backend),
         Box::new(backend::sgx::Backend),
         Box::new(backend::kvm::Backend),
     ];
+    //TOHERE
 
     //take the ENARX_BACKEND environment variable if available
     let backend_type: String;
@@ -124,49 +126,6 @@ fn main() -> Result<()> {
         Options::Exec(e) => exec_keep(Some(backend_type), e),
         Options::Daemon(d) => daemon(d, backend_type),
     }
-}
-
-fn daemon(opts: Daemon, backend_type: String) -> Result<()> {
-    //bind to unix socket
-    //await commands
-    let kuuid = opts.kuuid.clone();
-    println!("kuuid = {}", kuuid);
-    let bind_socket = format!("/tmp/enarx-keep-{}.sock", kuuid);
-    println!("binding to {}", bind_socket);
-    let keepapploader = Arc::new(Mutex::new(build_keepapploader(
-        backend_type,
-        KEEP_LOADER_STATE_UNDEF,
-        kuuid.parse().expect("problems parsing kuuid"),
-        0,
-        "".to_string(),
-        None,
-    )));
-
-    let listener = UnixListener::bind(bind_socket).unwrap();
-    //initialise state as listening
-    //TODO - error checking
-    let set_state_result = set_state(KEEP_LOADER_STATE_LISTENING, keepapploader.clone());
-    match set_state_result {
-        Ok(_v) => {}
-        Err(e) => println!("Error setting state, {}", e),
-    }
-
-    //only one bind at a time expected here (check for auth-token?)
-    //but our connectee may drop, so keep listening
-    for stream in listener.incoming() {
-        match stream {
-            Ok(stream) => {
-                let childstate = keepapploader.clone();
-                thread::spawn(move || keep_loader_connection(stream, childstate));
-            }
-            Err(err) => {
-                println!("Keep-loader error in stream: {}", err);
-                //TODO - something better here, including clean-up for /tmp file
-                panic!("Stream error {}", err);
-            }
-        }
-    }
-    Ok(())
 }
 
 fn info(backends: &[Box<dyn Backend>]) -> Result<()> {
@@ -237,6 +196,49 @@ fn exec_keep(backend_type: Option<String>, opts: Exec) -> Result<()> {
     }
 
     unreachable!();
+}
+
+fn daemon(opts: Daemon, backend_type: String) -> Result<()> {
+    //bind to unix socket
+    //await commands
+    let kuuid = opts.kuuid.clone();
+    println!("kuuid = {}", kuuid);
+    let bind_socket = format!("/tmp/enarx-keep-{}.sock", kuuid);
+    println!("binding to {}", bind_socket);
+    let keepapploader = Arc::new(Mutex::new(build_keepapploader(
+        backend_type,
+        KEEP_LOADER_STATE_UNDEF,
+        kuuid.parse().expect("problems parsing kuuid"),
+        0,
+        "".to_string(),
+        None,
+    )));
+
+    let listener = UnixListener::bind(bind_socket).unwrap();
+    //initialise state as listening
+    //TODO - error checking
+    let set_state_result = set_state(KEEP_LOADER_STATE_LISTENING, keepapploader.clone());
+    match set_state_result {
+        Ok(_v) => {}
+        Err(e) => println!("Error setting state, {}", e),
+    }
+
+    //only one bind at a time expected here (check for auth-token?)
+    //but our connectee may drop, so keep listening
+    for stream in listener.incoming() {
+        match stream {
+            Ok(stream) => {
+                let childstate = keepapploader.clone();
+                thread::spawn(move || keep_loader_connection(stream, childstate));
+            }
+            Err(err) => {
+                println!("Keep-loader error in stream: {}", err);
+                //TODO - something better here, including clean-up for /tmp file
+                panic!("Stream error {}", err);
+            }
+        }
+    }
+    Ok(())
 }
 
 fn build_exec(sock: Option<PathBuf>, code: PathBuf) -> Exec {
