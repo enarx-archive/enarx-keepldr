@@ -119,11 +119,22 @@ fn main() -> Result<()> {
         None => backend_type = String::from("nil"),
     }
 
+    //    let initial_keep: KeepLoader =
+    //        build_keepapploader(backend_type, KEEP_LOADER_STATE_UNDEF, 0, 0, "", e);
+
     match Options::from_args() {
         // we don't need the backends at this point for our Daemon,
         //  and generating a threadsafe version is overkill
         Options::Info(_) => info(backends),
-        Options::Exec(e) => exec_keep(Some(backend_type), e),
+        //Options::Exec(e) => exec_keep(initial_keep),
+        Options::Exec(e) => exec_keep(build_keepapploader(
+            backend_type,
+            KEEP_LOADER_STATE_UNDEF,
+            0,
+            0,
+            "".to_string(),
+            Some(e),
+        )),
         Options::Daemon(d) => daemon(d, backend_type),
     }
 }
@@ -160,20 +171,24 @@ fn info(backends: &[Box<dyn Backend>]) -> Result<()> {
 }
 
 #[allow(unreachable_code)]
-fn exec_keep(backend_type: Option<String>, opts: Exec) -> Result<()> {
+fn exec_keep(keeploader: KeepLoader) -> Result<()> {
+    //fn exec_keep(backend_type: Option<String>, opts: Exec) -> Result<()> {
     let backends: &[Box<dyn Backend>] = &[
         Box::new(backend::sev::Backend),
         Box::new(backend::sgx::Backend),
         Box::new(backend::kvm::Backend),
     ];
-    let keep = backend_type;
+    let keep = Some(keeploader.backend_type);
     let backend = backends
         .iter()
         .filter(|b| keep.is_none() || keep == Some(b.name().into()))
         .find(|b| b.have());
     if let Some(backend) = backend {
-        let code = Component::from_path(&opts.code)?;
-        let keep = backend.build(code, opts.sock.as_deref())?;
+        let exec: Exec = keeploader.exec.unwrap();
+        //        let code = Component::from_path(&opts.code)?;
+        let code = Component::from_path(&exec.code)?;
+        //        let keep = backend.build(code, opts.sock.as_deref())?;
+        let keep = backend.build(code, exec.sock.as_deref())?;
 
         let mut thread = keep.clone().add_thread()?;
         loop {
@@ -186,11 +201,14 @@ fn exec_keep(backend_type: Option<String>, opts: Exec) -> Result<()> {
         }
     } else {
         match keep {
-            Some(name) if name != "nil" => panic!("Keep backend '{}' is unsupported.", name),
-            _ => {
-                let cstr = CString::new(opts.code.as_os_str().as_bytes()).unwrap();
+            Some(name) if name == "nil" => {
+                let cstr =
+                    CString::new(keeploader.exec.unwrap().code.as_os_str().as_bytes()).unwrap();
                 unsafe { libc::execl(cstr.as_ptr(), cstr.as_ptr(), null::<c_char>()) };
                 return Err(Error::last_os_error().into());
+            }
+            _ => {
+                panic!("Keep backend is unsupported.");
             }
         }
     }
@@ -201,7 +219,7 @@ fn exec_keep(backend_type: Option<String>, opts: Exec) -> Result<()> {
 fn daemon(opts: Daemon, backend_type: String) -> Result<()> {
     //bind to unix socket
     //await commands
-    let kuuid = opts.kuuid.clone();
+    let kuuid = opts.kuuid;
     println!("kuuid = {}", kuuid);
     let bind_socket = format!("/tmp/enarx-keep-{}.sock", kuuid);
     println!("binding to {}", bind_socket);
@@ -242,10 +260,7 @@ fn daemon(opts: Daemon, backend_type: String) -> Result<()> {
 }
 
 fn build_exec(sock: Option<PathBuf>, code: PathBuf) -> Exec {
-    Exec {
-        sock: sock,
-        code: code,
-    }
+    Exec { sock, code }
 }
 
 fn build_keepapploader(
@@ -257,12 +272,12 @@ fn build_keepapploader(
     exec: Option<Exec>,
 ) -> KeepLoader {
     KeepLoader {
-        backend_type: backend_type,
-        state: state,
-        kuuid: kuuid,
-        app_loader_bind_port: app_loader_bind_port,
-        bindaddress: bindaddress,
-        exec: exec,
+        backend_type,
+        state,
+        kuuid,
+        app_loader_bind_port,
+        bindaddress,
+        exec,
     }
 }
 
@@ -278,7 +293,7 @@ fn keep_loader_connection(stream: UnixStream, keepapploader: Arc<Mutex<KeepLoade
     let deserializer = serde_json::Deserializer::from_reader(stream);
     let iterator = deserializer.into_iter::<serde_json::Value>();
 
-    let kal = keepapploader.clone();
+    let kal = keepapploader;
 
     for json_pair in iterator {
         match json_pair {
@@ -298,7 +313,7 @@ fn keep_loader_connection(stream: UnixStream, keepapploader: Arc<Mutex<KeepLoade
                             .commandcontents
                             .parse()
                             .expect("problems parsing port information");
-                        kal.lock().unwrap().app_loader_bind_port = app_port.clone();
+                        kal.lock().unwrap().app_loader_bind_port = app_port;
                     }
                     KEEP_PREATT_SOCK_COMMAND => {
                         exec.sock = Some(PathBuf::from(json_command.commandcontents));
@@ -342,10 +357,7 @@ fn keep_loader_connection(stream: UnixStream, keepapploader: Arc<Mutex<KeepLoade
                             }
                             _ => {
                                 //manage all other types
-                                let exec_result = exec_keep(
-                                    Some(backend_type.clone()),
-                                    kal.lock().unwrap().exec.clone().unwrap(),
-                                );
+                                let exec_result = exec_keep(kal.lock().unwrap().clone());
                                 match exec_result {
                                     Ok(_) => {}
                                     Err(e) => {
@@ -365,7 +377,7 @@ fn keep_loader_connection(stream: UnixStream, keepapploader: Arc<Mutex<KeepLoade
                         let serializedjson =
                             serde_json::to_string(&keepresponse).expect("problem serializing data");
                         println!("Sending JSON data from keep-loader\n{}", serializedjson);
-                        &stream
+                        stream
                             .write_all(&serializedjson.as_bytes())
                             .expect("failed to write");
                     }
@@ -401,6 +413,7 @@ fn set_state(desired_state: u8, keeploaderapp: Arc<Mutex<KeepLoader>>) -> Result
     // (previously had some problems with fallthrough?)
     //note - if you mistype these variable names, Rust sometimes fails to match
     // silently - unclear why
+
     if keep_app.state == KEEP_LOADER_STATE_UNDEF {
         match desired_state {
             KEEP_LOADER_STATE_LISTENING => {
