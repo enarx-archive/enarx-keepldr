@@ -5,10 +5,10 @@ Documentation=https://github.com/enarx/
 [Service]
 Type=simple
 Environment="SCRIPT_ARGS=%I"
-ExecStart=/home/mike/programming/enarx/host-components/target/debug/keep-loader $SCRIPT_ARGS
+ExecStart=/home/mike/programming/enarx-keepldr/target/debug/enarx-keepldr $SCRIPT_ARGS
 
 UMask=0066
 
-StandardOutput=file:/home/mike/keeploader-%i.log
-StandardError=file:/home/mike/keeploader-%i.err
+StandardOutput=file:/home/mike/enarx-keepldr-%i.log
+StandardError=file:/home/mike/enarx-keepldr-%i.err
 

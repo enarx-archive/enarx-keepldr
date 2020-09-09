@@ -103,6 +103,7 @@ enum Options {
 
 fn main() -> Result<()> {
     println!("Welcome to a new keep-loader");
+
     //NOTE - this block is replicated in the function exec-keep, which is
     // not optimal
     let backends: &[Box<dyn Backend>] = &[
@@ -115,22 +116,28 @@ fn main() -> Result<()> {
     let backend_type: String;
     match std::env::var_os("ENARX_BACKEND").map(|x| x.into_string().unwrap()) {
         Some(b) => backend_type = b,
-        None => backend_type = String::from("nil"),
+        None => backend_type = String::from(KEEP_ARCH_WASI),
     }
 
+    println!("Using backend_type {}", backend_type);
     match Options::from_args() {
         // we don't need the backends at this point for our Daemon,
         //  and generating a threadsafe version is overkill
         Options::Info(_) => info(backends),
         Options::Exec(e) => exec_keep(build_keepapploader(
+            //use some sensible defaults
             backend_type,
             KEEP_LOADER_STATE_UNDEF,
-            0,
-            0,
-            "".to_string(),
+            //TODO need to decide do with this (does it matter?), for now go with 1
+            1,
+            APP_LOADER_BIND_PORT_START,
+            "127.0.0.1".to_string(),
             Some(e),
         )),
-        Options::Daemon(d) => daemon(d, backend_type),
+        Options::Daemon(d) => {
+            println!("About to start the daemon");
+            daemon(d, backend_type)
+        }
     }
 }
 
@@ -193,13 +200,39 @@ fn exec_keep(keeploader: KeepLoader) -> Result<()> {
         }
     } else {
         match keep {
-            //TODO - some debug here
-            Some(name) if name == "nil" => {
-                //TODO - or WASMTIME...
-                //TODO - use the enarx-wasmldr binary with relevant args
+            Some(name) if name == KEEP_ARCH_WASI => {
+                /*
                 let cstr =
                     CString::new(keeploader.exec.unwrap().code.as_os_str().as_bytes()).unwrap();
                 unsafe { libc::execl(cstr.as_ptr(), cstr.as_ptr(), null::<c_char>()) };
+                return Err(Error::last_os_error().into());
+                 */
+                /*
+                let binary_path_cstring_ =
+                    CString::new(WASM_RUNTIME_BINARY_PATH.as_bytes()).unwrap();
+                let address_cstring_ = CString::new("127.0.0.1".as_bytes()).unwrap();
+                let port_cstring_ =
+                    CString::new(APP_LOADER_BIND_PORT_START.to_string().as_bytes()).unwrap();
+                 */
+                println!(
+                    "About to start a WASM binary ({}) on {}:{}",
+                    WASM_RUNTIME_BINARY_PATH,
+                    &keeploader.bindaddress,
+                    keeploader.app_loader_bind_port,
+                );
+                let binary_path_cstring_ =
+                    CString::new(WASM_RUNTIME_BINARY_PATH.as_bytes()).unwrap();
+                let address_cstring_ = CString::new(keeploader.bindaddress.as_bytes()).unwrap();
+                let port_cstring_ =
+                    CString::new(keeploader.app_loader_bind_port.to_string().as_bytes()).unwrap();
+                unsafe {
+                    libc::execl(
+                        binary_path_cstring_.as_ptr(),
+                        address_cstring_.as_ptr(),
+                        port_cstring_.as_ptr(),
+                        null::<c_char>(),
+                    )
+                };
                 return Err(Error::last_os_error().into());
             }
             _ => {
@@ -218,12 +251,13 @@ fn daemon(opts: Daemon, backend_type: String) -> Result<()> {
     println!("kuuid = {}", kuuid);
     let bind_socket = format!("/tmp/enarx-keep-{}.sock", kuuid);
     println!("binding to {}", bind_socket);
+    //create a keeploader with some sensible defaults
     let keepapploader = Arc::new(Mutex::new(build_keepapploader(
         backend_type,
         KEEP_LOADER_STATE_UNDEF,
         kuuid.parse().expect("problems parsing kuuid"),
-        0,
-        "".to_string(),
+        APP_LOADER_BIND_PORT_START,
+        "127.0.0.1".to_string(),
         None,
     )));
 
@@ -277,10 +311,9 @@ fn build_keepapploader(
 }
 
 fn keep_loader_connection(stream: UnixStream, keepapploader: Arc<Mutex<KeepLoader>>) {
-    //the below values are very much fall-backs
-    let mut app_addr: String = String::from("127.0.0.1");
-    let mut app_port: u16 = APP_LOADER_BIND_PORT_START;
-    let mut backend_type: String = String::from("nil");
+    let mut app_addr;
+    let mut app_port;
+    let mut backend_type: String;
     let mut exec: Exec = build_exec(Some(PathBuf::new()), PathBuf::new());
 
     //let mut json_pair: serde_json::value::Value;
@@ -319,6 +352,28 @@ fn keep_loader_connection(stream: UnixStream, keepapploader: Arc<Mutex<KeepLoade
                         kal.lock().unwrap().exec = Some(exec.clone());
                     }
                     KEEP_APP_LOADER_START_COMMAND => {
+                        println!("About to attempt to spawn keep");
+                        let child_spawn_result = exec_keep(kal.lock().unwrap().clone());
+                        match &child_spawn_result {
+                            Ok(_v) => {
+                                //TODO - Will we ever reach here?
+                                let state_result =
+                                    set_state(KEEP_LOADER_STATE_STARTED, kal.clone());
+                                match state_result {
+                                    Ok(_v) => println!("Spawned new runtime, set state"),
+                                    Err(e) => {
+                                        println!("Spawned new runtime, no state set due to {}!", e)
+                                    }
+                                }
+                                println!("Set state attempted");
+                                println!("State = {}", kal.lock().unwrap().state);
+                            }
+                            Err(e) => {
+                                println!("Error spawning runtime {:?}", e);
+                            }
+                        }
+
+                        /*
                         //TODO - remove this match, make everything use exec_keep
                         match backend_type.as_str() {
                             KEEP_ARCH_WASI => {
@@ -361,7 +416,7 @@ fn keep_loader_connection(stream: UnixStream, keepapploader: Arc<Mutex<KeepLoade
                                     }
                                 }
                             }
-                        }
+                        }*/
                     }
                     KEEP_INFO_COMMAND => {
                         //provide information back
