@@ -372,51 +372,6 @@ fn keep_loader_connection(stream: UnixStream, keepapploader: Arc<Mutex<KeepLoade
                                 println!("Error spawning runtime {:?}", e);
                             }
                         }
-
-                        /*
-                        //TODO - remove this match, make everything use exec_keep
-                        match backend_type.as_str() {
-                            KEEP_ARCH_WASI => {
-                                //use local
-                                println!(
-                                    "About to spawn, listening on port {}",
-                                    app_port.to_string()
-                                );
-                                let child_spawn_result =
-                                    std::process::Command::new(WASM_RUNTIME_BINARY_PATH)
-                                        .arg(&app_addr)
-                                        .arg(app_port.to_string())
-                                        .spawn();
-                                match &child_spawn_result {
-                                    Ok(_v) => {
-                                        let state_result =
-                                            set_state(KEEP_LOADER_STATE_STARTED, kal.clone());
-                                        match state_result {
-                                            Ok(_v) => println!("Spawned new runtime, set state"),
-                                            Err(e) => println!(
-                                                "Spawned new runtime, no state set due to {}!",
-                                                e
-                                            ),
-                                        }
-                                        println!("Set state attempted");
-                                        println!("State = {}", kal.lock().unwrap().state);
-                                    }
-                                    Err(e) => {
-                                        println!("Error spawning runtime {:?}", e);
-                                    }
-                                }
-                            }
-                            _ => {
-                                //manage all other types
-                                let exec_result = exec_keep(kal.lock().unwrap().clone());
-                                match exec_result {
-                                    Ok(_) => {}
-                                    Err(e) => {
-                                        println!("Failed to execute keep, {}", e);
-                                    }
-                                }
-                            }
-                        }*/
                     }
                     KEEP_INFO_COMMAND => {
                         //provide information back
