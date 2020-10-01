@@ -26,6 +26,24 @@ jobs:
           - {name: shim-sgx, path: internal/shim-sgx/Cargo.toml}
           - {name: shim-sev, path: internal/shim-sev/Cargo.toml}
 
+  clippy-all:
+    name: clippy::all (${{ matrix.crate.name }})
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: |
+          echo "The following files do not #![deny(clippy::all)]:"
+          ! git grep -LF "#![deny(clippy::all)]" -- "${{ matrix.crate.path }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        crate:
+          - {name: enarx-keepldr, path: src/main.rs}
+          - {name: rcrt1, path: internal/rcrt1/src/lib.rs}
+          - {name: sallyport, path: internal/sallyport/src/lib.rs}
+          - {name: shim-sgx, path: internal/shim-sgx/src/main.rs}
+          - {name: shim-sev, path: internal/shim-sev/src/main.rs}
+
   clippy:
     name: cargo clippy (${{ matrix.crate.name }})
     runs-on: ubuntu-20.04
