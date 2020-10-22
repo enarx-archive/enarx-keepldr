@@ -77,6 +77,9 @@
 //!     Copy (or link) the files in external/*.service to ~/.config/systemd/user/
 //!     $ systemctl --user daemon-reload
 //!     $ systemctl --user start enarx-keep-nil@[Uuid].service
+//!
+//! Output will go to journalctl and console: edit the files in
+//!  enarx-keepldr/external to change
 
 #![deny(clippy::all)]
 #![deny(missing_docs)]

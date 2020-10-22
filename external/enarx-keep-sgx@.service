@@ -9,6 +9,6 @@ ExecStart=/home/mike/programming/enarx-keepldr/target/debug/enarx-keepldr kuuid 
 
 UMask=0066
 
-StandardOutput=file:/home/mike/enarx-keepldr-%i.log
-StandardError=file:/home/mike/enarx-keepldr-%i.err
+StandardOutput=journal+console
+StandardError=journal+console
 
