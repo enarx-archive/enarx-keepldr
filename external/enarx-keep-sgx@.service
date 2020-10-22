@@ -1,0 +1,14 @@
+[Unit]
+Description=Enarx Keep-Loader (SGX)
+Documentation=https://github.com/enarx/
+
+[Service]
+Type=simple
+Environment="ENARX_BACKEND=sgx"
+ExecStart=/home/mike/programming/enarx-keepldr/target/debug/enarx-keepldr kuuid I%
+
+UMask=0066
+
+StandardOutput=file:/home/mike/enarx-keepldr-%i.log
+StandardError=file:/home/mike/enarx-keepldr-%i.err
+

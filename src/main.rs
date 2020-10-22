@@ -70,6 +70,13 @@
 //! Or specific backends can be compiled in:
 //!
 //!     $ cargo build --features=backend-sgx,backend-kvm
+//!
+//! #Launch via systemd (not yet fully working)
+//!   - This is for testing on a (possibly shared) system
+//!
+//!     Copy (or link) the files in external/*.service to ~/.config/systemd/user/
+//!     $ systemctl --user daemon-reload
+//!     $ systemctl --user start enarx-keep-nil@[Uuid].service
 
 #![deny(clippy::all)]
 #![deny(missing_docs)]
@@ -95,6 +102,8 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
 use std::ptr::null;
 
+use uuid::Uuid;
+
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
 
@@ -113,11 +122,19 @@ struct Exec {
     code: PathBuf,
 }
 
+/// Takes a kuuid and then executes
+#[derive(StructOpt)]
+struct Kuuid {
+    /// The Kuuid
+    kuuid: Uuid,
+}
+
 #[derive(StructOpt)]
 #[structopt(version=VERSION, author=AUTHORS.split(";").nth(0).unwrap())]
 enum Options {
     Info(Info),
     Exec(Exec),
+    Kuuid(Kuuid),
 }
 
 fn main() -> Result<()> {
@@ -133,6 +150,7 @@ fn main() -> Result<()> {
     match Options::from_args() {
         Options::Info(_) => info(backends),
         Options::Exec(e) => exec(backends, e),
+        Options::Kuuid(k) => kuuid(backends, k),
     }
 }
 
@@ -164,6 +182,13 @@ fn info(backends: &[Box<dyn Backend>]) -> Result<()> {
         }
     }
 
+    Ok(())
+}
+
+fn kuuid(_backends: &[Box<dyn Backend>], kuuid: Kuuid) -> Result<()> {
+    //currently a stub
+    //TODO - add execution
+    println!("Kuuid received {:?}", kuuid.kuuid);
     Ok(())
 }
 
