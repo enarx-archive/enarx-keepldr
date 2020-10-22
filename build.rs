@@ -93,7 +93,8 @@ fn build_cc_tests(in_path: &Path, out_path: &Path) {
         let status = cmd
             .current_dir(&out_path)
             .arg("-nostdlib")
-            .arg("-static-pie")
+            .arg("-static")
+	    .arg("-pie")
             .arg("-fPIC")
             .arg("-o")
             .arg(output)

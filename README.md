@@ -49,7 +49,7 @@ technologies such as Intel SGX or AMD SEV.
     }
     EOF
 
-    $ musl-gcc -static-pie -fPIC -o test test.c
+    $ musl-gcc -static -pie -fPIC -o test test.c
     $ target/debug/enarx-keepldr exec ./test
     Hello World!
 
