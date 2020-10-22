@@ -71,7 +71,7 @@
 //!
 //!     $ cargo build --features=backend-sgx,backend-kvm
 //!
-//! #Launch via systemd (not yet fully working)
+//! # Launch via systemd (not yet fully working)
 //!   - This is for testing on a (possibly shared) system
 //!
 //!     Copy (or link) the files in external/*.service to ~/.config/systemd/user/
