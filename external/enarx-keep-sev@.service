@@ -1,0 +1,14 @@
+[Unit]
+Description=Enarx Keep-Loader (sev)
+Documentation=https://github.com/enarx/
+
+[Service]
+Type=simple
+Environment="ENARX_BACKEND=sev"
+ExecStart=/home/mike/programming/enarx-keepldr/target/debug/enarx-keepldr exec --sock I% ./test
+
+UMask=0066
+
+StandardOutput=journal+console
+StandardError=journal+console
+

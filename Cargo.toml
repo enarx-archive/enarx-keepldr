@@ -49,8 +49,11 @@ anyhow = "1.0"
 goblin = "0.3"
 libc = "0.2"
 lset = "0.1"
+
 protobuf = "2.18"
 openssl = "0.10"
+uuid =  { version = "0.8", features = ["serde", "v4"] }#
+
 
 [build-dependencies]
 cc = "1.0"

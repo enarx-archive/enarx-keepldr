@@ -59,4 +59,14 @@ Or specific backends can be compiled in:
 
     $ cargo build --features=backend-sgx,backend-kvm
 
+## Launch via systemd (not yet fully working)
+  - This is for testing on a (possibly shared) system
+
+    Copy (or link) the files in external/*.service to ~/.config/systemd/user/
+    $ systemctl --user daemon-reload
+    $ systemctl --user start enarx-keep-nil@[Uuid].service
+
+Output will go to journalctl and console: edit the files in
+ enarx-keepldr/external to change
+
 License: Apache-2.0

@@ -1,0 +1,15 @@
+[Unit]
+Description=Enarx Keep-Loader (nil)
+Documentation=https://github.com/enarx/
+
+[Service]
+Type=simple
+Environment="ENARX_BACKEND=nil"
+ExecStart=/home/mike/programming/enarx-keepldr/target/debug/enarx-keepldr exec --sock I% /home/mike/programming/enarx-wasmldr/target/x86_64-unknown-linux-musl/debug/enarx-wasmldr
+#/home/mike/programming/enarx-keepldr/test
+
+UMask=0066
+
+StandardOutput=journal+console
+StandardError=journal+console
+
