@@ -219,6 +219,12 @@ pub fn exit(status: libc::c_int) -> ! {
 }
 
 /// syscall
+pub fn close(status: libc::c_int) -> ! {
+    eprintln!("SC> close({})", status);
+    hostcall::shim_exit(status);
+}
+
+/// syscall
 pub fn exit_group(status: libc::c_int) -> ! {
     eprintln!("SC> exit_group({})", status);
     hostcall::shim_exit(status);
