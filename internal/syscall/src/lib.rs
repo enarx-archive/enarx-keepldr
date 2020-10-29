@@ -74,7 +74,13 @@ pub trait SyscallHandler: AddressValidator + Sized {
     fn trace(&mut self, name: &str, argc: usize);
 
     /// Enarx syscall - get attestation
-    fn get_attestation(&mut self) -> Result;
+    fn get_attestation(
+        &mut self,
+        nonce: UntrustedRef<u8>,
+        nonce_len: libc::size_t,
+        buf: UntrustedRefMut<u8>,
+        buf_len: libc::size_t,
+    ) -> Result;
 
     /// syscall
     fn exit(&mut self, status: libc::c_int) -> !;
@@ -168,7 +174,7 @@ pub trait SyscallHandler: AddressValidator + Sized {
             libc::SYS_geteuid => self.geteuid(),
             libc::SYS_getegid => self.getegid(),
 
-            SYS_GETATT => self.get_attestation(),
+            SYS_GETATT => self.get_attestation(a.into(), b.into(), c.into(), d.into()),
 
             _ => Err(libc::ENOSYS),
         };
