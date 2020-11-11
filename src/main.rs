@@ -77,6 +77,7 @@
 
 mod backend;
 mod binary;
+mod protobuf;
 mod sallyport;
 
 // workaround for sallyport tests, until we have internal crates
