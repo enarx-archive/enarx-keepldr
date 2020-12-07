@@ -3,7 +3,7 @@
 //! syscall interface layer between assembler and rust
 
 use crate::addr::{HostVirtAddr, ShimPhysUnencryptedAddr};
-use crate::allocator::ALLOCATOR;
+use crate::allocator::{AllocateError, ALLOCATOR};
 use crate::asm::_enarx_asm_triple_fault;
 use crate::attestation::SEV_SECRET;
 use crate::eprintln;
@@ -23,7 +23,10 @@ use syscall::{
 use untrusted::{AddressValidator, UntrustedRef, UntrustedRefMut, Validate, ValidateSlice};
 use x86_64::instructions::tlb::flush_all;
 use x86_64::registers::{rdfsbase, rdgsbase, wrfsbase, wrgsbase};
-use x86_64::structures::paging::{Page, PageTableFlags, Size4KiB};
+use x86_64::structures::paging::mapper::{MapToError, MappedFrame, TranslateResult};
+use x86_64::structures::paging::{
+    Mapper, Page, PageTableFlags, Size1GiB, Size2MiB, Size4KiB, Translate,
+};
 use x86_64::{align_up, VirtAddr};
 
 #[repr(C)]
@@ -296,8 +299,6 @@ impl MemorySyscallHandler for Handler {
         self.trace("mprotect", 3);
         let addr = addr.as_ptr();
 
-        use x86_64::structures::paging::mapper::Mapper;
-
         let mut flags = PageTableFlags::PRESENT | PageTableFlags::USER_ACCESSIBLE;
 
         if prot & libc::PROT_WRITE != 0 {
@@ -394,6 +395,238 @@ impl MemorySyscallHandler for Handler {
                 unimplemented!()
             }
         }
+    }
+
+    fn mremap(
+        &mut self,
+        old_addr: UntrustedRefMut<u8>,
+        old_size: libc::size_t,
+        new_size: libc::size_t,
+        flags: libc::c_int,
+        _new_addr: UntrustedRef<u8>,
+    ) -> sallyport::Result {
+        self.trace("mremap", 5);
+
+        if old_size >= new_size {
+            return Err(libc::EINVAL);
+        }
+
+        let mut target_addr = old_addr
+            .validate_slice(old_size, self)
+            .ok_or(libc::EINVAL)?;
+
+        target_addr = unsafe {
+            if (flags & libc::MREMAP_FIXED) != libc::MREMAP_FIXED
+                && (flags & libc::MREMAP_MAYMOVE) == libc::MREMAP_MAYMOVE
+            {
+                let add_addr = target_addr.as_ptr().add(old_size);
+                let mut mapper = SHIM_PAGETABLE.write();
+                let mut allocator = ALLOCATOR.write();
+
+                match allocator.allocate_and_map_memory(
+                    mapper.deref_mut(),
+                    VirtAddr::from_ptr(add_addr),
+                    new_size - old_size,
+                    PageTableFlags::PRESENT
+                        | PageTableFlags::USER_ACCESSIBLE
+                        | PageTableFlags::WRITABLE,
+                    PageTableFlags::PRESENT
+                        | PageTableFlags::WRITABLE
+                        | PageTableFlags::USER_ACCESSIBLE,
+                ) {
+                    Err(AllocateError::NotAligned) => Err(libc::EINVAL),
+                    Err(AllocateError::OutOfMemory) => Err(libc::ENOMEM),
+                    Err(AllocateError::ZeroSize) => Err(libc::EINVAL),
+                    Err(AllocateError::PageAlreadyMapped)
+                    | Err(AllocateError::ParentEntryHugePage) => {
+                        // remap the whole thing
+                        let mut new_target_addr = *NEXT_MMAP_RWLOCK.read().deref();
+
+                        while mapper.translate_addr(new_target_addr).is_some() {
+                            new_target_addr += Page::<Size1GiB>::SIZE;
+                        }
+
+                        let mut to_map = old_size as u64;
+                        let mut old_addr = VirtAddr::from_ptr(target_addr.as_ptr());
+
+                        let mut new_addr = new_target_addr;
+
+                        loop {
+                            let mapped = match mapper.translate(old_addr) {
+                                TranslateResult::Mapped {
+                                    frame: MappedFrame::Size4KiB(frame),
+                                    offset: 0,
+                                    ..
+                                } => {
+                                    mapper
+                                        .map_to(
+                                            Page::<Size4KiB>::containing_address(new_addr),
+                                            frame,
+                                            PageTableFlags::PRESENT
+                                                | PageTableFlags::USER_ACCESSIBLE
+                                                | PageTableFlags::WRITABLE,
+                                            allocator.deref_mut(),
+                                        )
+                                        .map_err(|e| match e {
+                                            MapToError::FrameAllocationFailed => libc::ENOMEM,
+                                            MapToError::ParentEntryHugePage => libc::EINVAL,
+                                            MapToError::PageAlreadyMapped(_) => libc::EINVAL,
+                                        })?
+                                        .flush();
+                                    Page::<Size4KiB>::SIZE
+                                }
+                                TranslateResult::Mapped {
+                                    frame: MappedFrame::Size2MiB(frame),
+                                    offset: 0,
+                                    ..
+                                } => {
+                                    mapper
+                                        .map_to(
+                                            Page::<Size2MiB>::containing_address(new_addr),
+                                            frame,
+                                            PageTableFlags::PRESENT
+                                                | PageTableFlags::USER_ACCESSIBLE
+                                                | PageTableFlags::WRITABLE,
+                                            allocator.deref_mut(),
+                                        )
+                                        .map_err(|e| match e {
+                                            MapToError::FrameAllocationFailed => libc::ENOMEM,
+                                            MapToError::ParentEntryHugePage => libc::EINVAL,
+                                            MapToError::PageAlreadyMapped(_) => libc::EINVAL,
+                                        })?
+                                        .flush();
+                                    Page::<Size2MiB>::SIZE
+                                }
+                                TranslateResult::Mapped {
+                                    frame: MappedFrame::Size1GiB(frame),
+                                    offset: 0,
+                                    ..
+                                } => {
+                                    mapper
+                                        .map_to(
+                                            Page::<Size1GiB>::containing_address(new_addr),
+                                            frame,
+                                            PageTableFlags::PRESENT
+                                                | PageTableFlags::USER_ACCESSIBLE
+                                                | PageTableFlags::WRITABLE,
+                                            allocator.deref_mut(),
+                                        )
+                                        .map_err(|e| match e {
+                                            MapToError::FrameAllocationFailed => libc::ENOMEM,
+                                            MapToError::ParentEntryHugePage => libc::EINVAL,
+                                            MapToError::PageAlreadyMapped(_) => libc::EINVAL,
+                                        })?
+                                        .flush();
+                                    Page::<Size1GiB>::SIZE
+                                }
+                                _ => return Err(libc::EINVAL),
+                            };
+
+                            old_addr += mapped;
+                            new_addr += mapped;
+
+                            if to_map <= mapped {
+                                break;
+                            }
+
+                            to_map -= mapped;
+                        }
+
+                        let _p = allocator
+                            .allocate_and_map_memory(
+                                mapper.deref_mut(),
+                                new_addr,
+                                new_size - old_size,
+                                PageTableFlags::PRESENT
+                                    | PageTableFlags::USER_ACCESSIBLE
+                                    | PageTableFlags::WRITABLE,
+                                PageTableFlags::PRESENT
+                                    | PageTableFlags::WRITABLE
+                                    | PageTableFlags::USER_ACCESSIBLE,
+                            )
+                            .map_err(|e| match e {
+                                AllocateError::NotAligned => libc::EINVAL,
+                                AllocateError::OutOfMemory => libc::ENOMEM,
+                                AllocateError::ZeroSize => libc::EINVAL,
+                                AllocateError::PageAlreadyMapped => libc::EINVAL,
+                                AllocateError::ParentEntryHugePage => libc::EINVAL,
+                            })?;
+
+                        let mut old_addr = VirtAddr::from_ptr(target_addr.as_ptr());
+                        let mut to_map = old_size as u64;
+
+                        loop {
+                            let mapped = match mapper.translate(old_addr) {
+                                TranslateResult::Mapped {
+                                    frame: MappedFrame::Size4KiB(_),
+                                    offset: 0,
+                                    ..
+                                } => {
+                                    let (_, flush) = mapper
+                                        .unmap(Page::<Size4KiB>::containing_address(old_addr))
+                                        .map_err(
+                                            |_| libc::EINVAL, // FIXME
+                                        )?;
+                                    flush.flush();
+                                    Page::<Size4KiB>::SIZE
+                                }
+                                TranslateResult::Mapped {
+                                    frame: MappedFrame::Size2MiB(_),
+                                    offset: 0,
+                                    ..
+                                } => {
+                                    let (_, flush) = mapper
+                                        .unmap(Page::<Size2MiB>::containing_address(old_addr))
+                                        .map_err(
+                                            |_| libc::EINVAL, // FIXME
+                                        )?;
+                                    flush.flush();
+                                    Page::<Size2MiB>::SIZE
+                                }
+                                TranslateResult::Mapped {
+                                    frame: MappedFrame::Size1GiB(_),
+                                    offset: 0,
+                                    ..
+                                } => {
+                                    let (_, flush) = mapper
+                                        .unmap(Page::<Size1GiB>::containing_address(old_addr))
+                                        .map_err(
+                                            |_| libc::EINVAL, // FIXME
+                                        )?;
+                                    flush.flush();
+                                    Page::<Size1GiB>::SIZE
+                                }
+                                _ => return Err(libc::EINVAL),
+                            };
+
+                            old_addr += mapped;
+
+                            if to_map <= mapped {
+                                break;
+                            }
+
+                            to_map -= mapped;
+                        }
+
+                        let len_aligned =
+                            align_up((new_size - old_size) as _, Page::<Size1GiB>::SIZE);
+                        *NEXT_MMAP_RWLOCK.write().deref_mut() = new_target_addr + len_aligned;
+
+                        new_target_addr
+                            .as_mut_ptr::<u8>()
+                            .as_mut()
+                            .ok_or(libc::EINVAL)
+                            .map(|v| core::slice::from_raw_parts_mut(v, new_size))
+                    }
+                    Ok(_p) => Ok(target_addr),
+                }?
+            } else {
+                return Err(libc::EINVAL);
+            }
+        };
+
+        eprintln!("SC> mremap() = {:?}", target_addr.as_ptr());
+        Ok([target_addr.into(), Default::default()])
     }
 
     fn munmap(&mut self, addr: UntrustedRef<u8>, length: usize) -> sallyport::Result {
