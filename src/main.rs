@@ -55,8 +55,12 @@
 //! # Launch via systemd (not yet fully working)
 //!   - This is for testing on a (possibly shared) system
 //!
+//!     Edit the files in external/ to reflect your local paths
+//!     
 //!     Copy (or link) the files in external/*.service to ~/.config/systemd/user/
+//! 
 //!     $ systemctl --user daemon-reload
+//! 
 //!     $ systemctl --user start enarx-keep-nil@[Uuid].service
 //!
 //! Output will go to journalctl and console: edit the files in

@@ -37,7 +37,7 @@ impl Component {
 
         // Validate header assumptions.
         assert_eq!(elf.header.e_machine, EM_X86_64);
-        assert_eq!(elf.header.e_version, EV_CURRENT as _);
+//        assert_eq!(elf.header.e_version, EV_CURRENT as _);
         let pie = match elf.header.e_type {
             ET_DYN => true,
             ET_EXEC => false,
