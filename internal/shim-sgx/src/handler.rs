@@ -18,7 +18,7 @@ use sgx::{
 };
 use sgx_heap::Heap;
 use syscall::{
-    BaseSyscallHandler, EnarxSyscallHandler, FileSyscallHandler, MemorySyscallHandler,
+    BaseSyscallHandler, EnarxSyscallHandler, FdHandler, FileSyscallHandler, MemorySyscallHandler,
     NetworkSyscallHandler, ProcessSyscallHandler, SyscallHandler, SystemSyscallHandler,
     ARCH_GET_FS, ARCH_GET_GS, ARCH_SET_FS, ARCH_SET_GS, SGX_DUMMY_QUOTE, SGX_DUMMY_TI,
     SGX_QUOTE_SIZE, SGX_TECH, SYS_ENARX_CPUID, SYS_ENARX_GETATT,
@@ -125,6 +125,28 @@ impl<'a> AddressValidator for Handler<'a> {
 impl<'a> SyscallHandler for Handler<'a> {}
 impl<'a> SystemSyscallHandler for Handler<'a> {}
 impl<'a> NetworkSyscallHandler for Handler<'a> {}
+
+impl<'a> FdHandler for Handler<'a> {
+    fn fd_register(&mut self, fd: i32) {
+        unimplemented!()
+    }
+
+    fn fd_unregister(&mut self, fd: i32) {
+        unimplemented!()
+    }
+
+    fn fd_is_valid(&mut self, fd: i32) -> sallyport::Result {
+        unimplemented!()
+    }
+
+    fn fd_epoll_ctl(&mut self, epfd: i32, op: i32, fd: i32, event: epoll_event) {
+        unimplemented!()
+    }
+
+    fn fd_get_epoll_event_data(&mut self, epfd: i32, fd: i32) -> u64 {
+        unimplemented!()
+    }
+}
 
 impl<'a> BaseSyscallHandler for Handler<'a> {
     fn translate_shim_to_host_addr<T>(buf: *const T) -> usize {

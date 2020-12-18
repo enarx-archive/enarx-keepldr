@@ -8,6 +8,7 @@
 
 mod base;
 mod enarx;
+mod fdhandle;
 mod file;
 mod memory;
 mod network;
@@ -21,6 +22,7 @@ use untrusted::AddressValidator;
 
 pub use crate::base::BaseSyscallHandler;
 pub use crate::enarx::EnarxSyscallHandler;
+pub use crate::fdhandle::FdHandler;
 pub use crate::file::FileSyscallHandler;
 pub use crate::memory::MemorySyscallHandler;
 pub use crate::network::NetworkSyscallHandler;

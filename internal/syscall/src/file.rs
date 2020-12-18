@@ -2,23 +2,34 @@
 
 //! file syscalls
 
-use crate::BaseSyscallHandler;
+use crate::{BaseSyscallHandler, FdHandler};
 use core::mem::MaybeUninit;
 use sallyport::{request, Block, Result};
 use untrusted::{AddressValidator, UntrustedRef, UntrustedRefMut, Validate, ValidateSlice};
 
 /// file syscalls
-pub trait FileSyscallHandler: BaseSyscallHandler + AddressValidator + Sized {
+pub trait FileSyscallHandler: BaseSyscallHandler + FdHandler + AddressValidator + Sized {
     /// syscall
     fn close(&mut self, fd: libc::c_int) -> Result {
         self.trace("close", 1);
+
+        // check if operation is allowed on this fd
+        let _ = self.fd_is_valid(fd)?;
+
         let ret = unsafe { self.proxy(request!(libc::SYS_close => fd))? };
+
+        // internal book keeping
+        self.fd_unregister(fd);
+
         Ok(ret)
     }
 
     /// syscall
     fn read(&mut self, fd: libc::c_int, buf: UntrustedRefMut<u8>, count: libc::size_t) -> Result {
         self.trace("read", 4);
+
+        // check if operation is allowed on this fd
+        let _ = self.fd_is_valid(fd)?;
 
         let buf = buf.validate_slice(count, self).ok_or(libc::EFAULT)?;
 
@@ -56,6 +67,10 @@ pub trait FileSyscallHandler: BaseSyscallHandler + AddressValidator + Sized {
         iovcnt: libc::c_int,
     ) -> Result {
         self.trace("readv", 3);
+
+        // check if operation is allowed on this fd
+        let _ = self.fd_is_valid(fd)?;
+
         // FIXME: this is not an ideal implementation of readv, but for the sake
         // of simplicity this readv implementation behaves very much like how the
         // Linux kernel would for a module that does not support readv, but does
@@ -75,6 +90,9 @@ pub trait FileSyscallHandler: BaseSyscallHandler + AddressValidator + Sized {
         if fd != libc::STDOUT_FILENO && fd != libc::STDERR_FILENO {
             self.trace("write", 3);
         }
+
+        // check if operation is allowed on this fd
+        let _ = self.fd_is_valid(fd)?;
 
         // Limit the write to `Block::buf_capacity()`
         let count = usize::min(count, Block::buf_capacity());
@@ -105,6 +123,10 @@ pub trait FileSyscallHandler: BaseSyscallHandler + AddressValidator + Sized {
         iovcnt: libc::c_int,
     ) -> Result {
         self.trace("writev", 3);
+
+        // check if operation is allowed on this fd
+        let _ = self.fd_is_valid(fd)?;
+
         let iovec = iovec.validate_slice(iovcnt, self).ok_or(libc::EFAULT)?;
 
         let mut size = 0usize;
@@ -131,6 +153,10 @@ pub trait FileSyscallHandler: BaseSyscallHandler + AddressValidator + Sized {
     /// syscall
     fn ioctl(&mut self, fd: libc::c_int, request: libc::c_ulong, arg: usize) -> Result {
         self.trace("ioctl", 3);
+
+        // check if operation is allowed on this fd
+        let _ = self.fd_is_valid(fd)?;
+
         match (fd as _, request as _) {
             (libc::STDIN_FILENO, libc::TIOCGWINSZ)
             | (libc::STDOUT_FILENO, libc::TIOCGWINSZ)
@@ -168,6 +194,7 @@ pub trait FileSyscallHandler: BaseSyscallHandler + AddressValidator + Sized {
         bufsize: libc::size_t,
     ) -> Result {
         self.trace("readlink", 3);
+
         // Fake readlink("/proc/self/exe")
         const PROC_SELF_EXE: &str = "/proc/self/exe";
 
@@ -203,6 +230,10 @@ pub trait FileSyscallHandler: BaseSyscallHandler + AddressValidator + Sized {
     /// syscall
     fn fstat(&mut self, fd: libc::c_int, statbuf: UntrustedRefMut<libc::stat>) -> Result {
         self.trace("fstat", 2);
+
+        // check if operation is allowed on this fd
+        let _ = self.fd_is_valid(fd)?;
+
         // Fake fstat(0|1|2, ...) done by glibc or rust
         match fd {
             libc::STDIN_FILENO | libc::STDOUT_FILENO | libc::STDERR_FILENO => {
@@ -260,6 +291,10 @@ pub trait FileSyscallHandler: BaseSyscallHandler + AddressValidator + Sized {
     /// syscall
     fn fcntl(&mut self, fd: libc::c_int, cmd: libc::c_int, arg: libc::c_int) -> Result {
         self.trace("fcntl", 3);
+
+        // check if operation is allowed on this fd
+        let _ = self.fd_is_valid(fd)?;
+
         match (fd, cmd) {
             (libc::STDIN_FILENO, libc::F_GETFL) => {
                 //eprintln!("SC> fcntl({}, F_GETFL) = 0x402 (flags O_RDWR|O_APPEND)", fd);
@@ -307,6 +342,11 @@ pub trait FileSyscallHandler: BaseSyscallHandler + AddressValidator + Sized {
 
         let fds = fds.validate_slice(nfds, self).ok_or(libc::EFAULT)?;
 
+        // check if operation is allowed on these fds
+        for pollfd in fds.iter() {
+            let _ = self.fd_is_valid(pollfd.fd)?;
+        }
+
         let c = self.new_cursor();
 
         let (_, buf) = c.copy_from_slice(fds).or(Err(libc::EMSGSIZE))?;
@@ -328,6 +368,7 @@ pub trait FileSyscallHandler: BaseSyscallHandler + AddressValidator + Sized {
     /// syscall
     fn pipe(&mut self, pipefd: UntrustedRefMut<libc::c_int>) -> Result {
         self.trace("pipe", 1);
+
         let pipefd = pipefd.validate_slice(2, self).ok_or(libc::EFAULT)?;
         let c = self.new_cursor();
 
@@ -343,13 +384,23 @@ pub trait FileSyscallHandler: BaseSyscallHandler + AddressValidator + Sized {
                 .or(Err(libc::EFAULT))?;
         }
 
+        for fd in pipefd {
+            // register valid fd
+            self.fd_register(*fd);
+        }
+
         Ok(ret)
     }
 
     /// syscall
     fn epoll_create1(&mut self, flags: libc::c_int) -> Result {
         self.trace("epoll_create1", 1);
+
         let ret = unsafe { self.proxy(request!(libc::SYS_epoll_create1 => flags))? };
+
+        // register valid fd
+        self.fd_register(usize::from(ret[0]) as _);
+
         Ok(ret)
     }
 
@@ -362,6 +413,12 @@ pub trait FileSyscallHandler: BaseSyscallHandler + AddressValidator + Sized {
         event: UntrustedRef<libc::epoll_event>,
     ) -> Result {
         self.trace("epoll_ctl", 4);
+
+        // check if operation is allowed on this epfd
+        let _ = self.fd_is_valid(epfd)?;
+
+        // check if operation is allowed on this fd
+        let _ = self.fd_is_valid(fd)?;
 
         let event = event.validate(self).ok_or(libc::EFAULT)?;
 
@@ -386,6 +443,9 @@ pub trait FileSyscallHandler: BaseSyscallHandler + AddressValidator + Sized {
         timeout: libc::c_int,
     ) -> Result {
         self.trace("epoll_wait", 4);
+
+        // check if operation is allowed on this fd
+        let _ = self.fd_is_valid(epfd)?;
 
         let maxevents: usize = maxevents as _;
 
