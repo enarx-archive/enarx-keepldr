@@ -225,7 +225,6 @@ dependencies = [
  "anyhow",
  "cc",
  "ciborium 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "codicon",
  "colorful",
  "goblin 0.3.0",
  "iocuddle",
@@ -352,10 +351,11 @@ checksum = "d8972d5be69940353d5347a1344cb375d9b457d6809b428b05bb1ca2fb9ce007"
 [[package]]
 name = "koine"
 version = "0.1.0"
-source = "git+https://github.com/enarx/koine#abd3641d525fa292d2bead78f5e97874aa287472"
+source = "git+https://github.com/connorkuehl/koine?branch=serdles-all-the-way-down#8659386bbdce554872231636d00a4b94c69f3aa2"
 dependencies = [
  "ciborium 0.1.0 (git+https://github.com/enarx/ciborium?rev=bcaec75)",
  "serde",
+ "sev",
  "tokio",
  "uuid",
 ]
@@ -787,7 +787,7 @@ dependencies = [
 [[package]]
 name = "sev"
 version = "0.1.0"
-source = "git+https://github.com/enarx/sev#2aeb33cf70ee4aa6bf612e728573509576772e39"
+source = "git+https://github.com/connorkuehl/sev?branch=serdles-all-the-way-down#34d8a92b1c0f16040d90d61d0e7538dfc86fd940"
 dependencies = [
  "bitfield",
  "bitflags",
