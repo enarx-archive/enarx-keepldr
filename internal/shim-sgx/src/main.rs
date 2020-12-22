@@ -71,5 +71,6 @@ mod entry;
 mod event;
 mod handler;
 mod hostlib;
+mod spin;
 
 use hostlib::Layout;

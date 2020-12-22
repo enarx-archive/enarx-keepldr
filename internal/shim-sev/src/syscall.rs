@@ -9,14 +9,14 @@ use crate::attestation::SEV_SECRET;
 use crate::eprintln;
 use crate::hostcall::{HostCall, HOST_CALL_ALLOC};
 use crate::paging::SHIM_PAGETABLE;
-use crate::payload::{NEXT_BRK_RWLOCK, NEXT_MMAP_RWLOCK};
+use crate::payload::{NEXT_BRK_RWLOCK, NEXT_MMAP_RWLOCK, PROCESS_CONTEXT};
 use core::convert::TryFrom;
 use core::mem::size_of;
 use core::ops::{Deref, DerefMut};
 use primordial::{Address, Register};
 use sallyport::{Cursor, Request};
 use syscall::{
-    BaseSyscallHandler, EnarxSyscallHandler, FileSyscallHandler, MemorySyscallHandler,
+    BaseSyscallHandler, EnarxSyscallHandler, FdHandler, FileSyscallHandler, MemorySyscallHandler,
     NetworkSyscallHandler, ProcessSyscallHandler, SyscallHandler, SystemSyscallHandler,
     ARCH_GET_FS, ARCH_GET_GS, ARCH_SET_FS, ARCH_SET_GS, SEV_TECH,
 };
@@ -170,6 +170,55 @@ impl SyscallHandler for Handler {}
 impl SystemSyscallHandler for Handler {}
 impl NetworkSyscallHandler for Handler {}
 impl FileSyscallHandler for Handler {}
+
+impl FdHandler for Handler {
+    fn fd_register(&mut self, fd: i32) {
+        let i: usize = (fd / 8) as _;
+        let b: u8 = 1u8 << (fd % 8);
+
+        let mut context = PROCESS_CONTEXT.write();
+
+        if context.files[i] & b != 0 {
+            panic!("Register already registered fd")
+        }
+
+        context.files[i] = context.files[i] | b;
+    }
+
+    fn fd_unregister(&mut self, fd: i32) {
+        let i: usize = (fd / 8) as _;
+        let b: u8 = 1u8 << (fd % 8);
+
+        let mut context = PROCESS_CONTEXT.write();
+
+        if context.files[i] & b == 0 {
+            panic!("Unregister not registered fd")
+        }
+
+        context.files[i] = context.files[i] & (!b);
+    }
+
+    fn fd_is_valid(&mut self, fd: i32) -> sallyport::Result {
+        let i: usize = (fd / 8) as _;
+        let b: u8 = 1u8 << (fd % 8);
+
+        let context = PROCESS_CONTEXT.read();
+
+        if context.files[i] & b == 0 {
+            return Err(libc::EBADFD);
+        }
+
+        Ok(Default::default())
+    }
+
+    fn fd_epoll_ctl(&mut self, epfd: i32, op: i32, fd: i32, event: libc::epoll_event) {
+        unimplemented!()
+    }
+
+    fn fd_get_epoll_event_data(&mut self, epfd: i32, fd: i32) -> u64 {
+        unimplemented!()
+    }
+}
 
 impl BaseSyscallHandler for Handler {
     fn unknown_syscall(
