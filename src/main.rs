@@ -52,7 +52,7 @@
 //!
 //!     $ cargo build --features=backend-sgx,backend-kvm
 //!
-//! # Launch via systemd (not yet fully working)
+//! # Launch via systemd 
 //!   - This is for testing on a (possibly shared) system
 //!
 //!     Edit the files in external/ to reflect your local paths
