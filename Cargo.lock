@@ -559,24 +559,24 @@ dependencies = [
 
 [[package]]
 name = "protobuf"
-version = "2.18.1"
+version = "2.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da78e04bc0e40f36df43ecc6575e4f4b180e8156c4efd73f13d5619479b05696"
+checksum = "752bcc33744248486d11c056334a8c9f1763d86ed9a393d50ca4f23a86c9beba"
 
 [[package]]
 name = "protobuf-codegen"
-version = "2.18.1"
+version = "2.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49b2b929363268881afe6d24351e8b711ea5a1901a5e1549d3723ebcc5d3696d"
+checksum = "6abe2e67fca0f44c27142172b3ecb8d45b217c6bf14f9e11b123ea99d8abb12d"
 dependencies = [
  "protobuf",
 ]
 
 [[package]]
 name = "protobuf-codegen-pure"
-version = "2.18.1"
+version = "2.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02a4b843fcc85f42b9f717a34481b9a323527f1b6ac62b20776514c044fc7da9"
+checksum = "f514b968ea785289758e621e7f66dbc1add76715fdc0a980e659049564501e3e"
 dependencies = [
  "protobuf",
  "protobuf-codegen",
