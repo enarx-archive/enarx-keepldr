@@ -248,9 +248,10 @@ impl backend::Backend for Backend {
     }
 
     fn build(&self, code: Component, sock: Option<&Path>) -> Result<Arc<dyn Keep>> {
+        println!("Building sev keep");
         let shim = Component::from_bytes(SHIM)?;
         let sock = attestation_bridge(sock)?;
-
+        println!("sock available");
         let vm = Builder::new(shim, code, builder::Sev::new(sock))
             .build::<X86, personality::Sev>()?
             .vm();
@@ -272,9 +273,17 @@ impl backend::Backend for Backend {
 }
 
 fn attestation_bridge(sock: Option<&Path>) -> Result<UnixStream> {
+    println!("attestation_bridge creation");
     let sock = match sock {
-        Some(s) => UnixStream::connect(s)?,
+        Some(s) => {
+            let connect_result: Result<UnixStream, std::io::Error> = UnixStream::connect(s);
+            match connect_result {
+                Ok(s) => s,
+                Err(e) => panic!("problem with connection, {}", e),
+            }
+        }
         None => {
+            println!("No path found");
             let (synthetic_client, sock) = UnixStream::pair()?;
             std::thread::spawn(move || unattested_launch::launch(synthetic_client));
             sock
