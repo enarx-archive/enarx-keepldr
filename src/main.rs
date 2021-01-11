@@ -52,7 +52,7 @@
 //!
 //!     $ cargo build --features=backend-sgx,backend-kvm
 //!
-//! # Launch via systemd 
+//! # Launch via systemd
 //!   - This is for testing on a (possibly shared) system
 //!
 //!     FIXME - edit hard-coded IP address in enarx-wasmldr/src/main.rs
@@ -66,7 +66,7 @@
 //!     $ systemctl --user link external/<name-of-service>.service
 //!
 //!     $ systemctl --user daemon-reload
-//! 
+//!
 //!     $ systemctl --user start enarx-keep-nil@[Uuid].service
 //!
 //! Output will go to journalctl and console: edit the files in
@@ -226,20 +226,20 @@ fn measure(backends: &[Box<dyn Backend>], opts: Report) -> Result<()> {
 #[allow(clippy::unnecessary_wraps)]
 fn exec(backends: &[Box<dyn Backend>], opts: Exec) -> Result<()> {
     let keep = std::env::var_os("ENARX_BACKEND").map(|x| x.into_string().unwrap());
-    println!("keep = {:?}", keep);
+    //println!("keep = {:?}", keep);
     let backend = backends
         .iter()
         .filter(|b| keep.is_none() || keep == Some(b.name().into()))
         .find(|b| b.have());
 
     if let Some(backend) = backend {
-        println!("We seem to have a backend");
+        //println!("We seem to have a backend");
         let code = Component::from_path(&opts.code)?;
-        println!("No problem with code");
-        println!("About to try building backend with {:?}", &opts.sock.as_deref().unwrap());
+        //println!("No problem with code");
+        //println!("About to try building backend with {:?}", &opts.sock.as_deref().unwrap());
         let keep = backend.build(code, opts.sock.as_deref())?;
 
-        println!("A keep has been built!");
+        //println!("A keep has been built!");
         let mut thread = keep.clone().add_thread()?;
         loop {
             match thread.enter()? {
