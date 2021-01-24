@@ -97,8 +97,7 @@ use std::os::raw::c_char;
 use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
 use std::ptr::null;
-
-use uuid::Uuid;
+//use uuid::Uuid;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
@@ -124,12 +123,14 @@ struct Report {
     /// The payload to run inside the keep
     code: PathBuf,
 }
+/*
 /// Takes a kuuid and then executes
 #[derive(StructOpt)]
 struct Kuuid {
     /// The Kuuid
     kuuid: Uuid,
 }
+*/
 
 #[derive(StructOpt)]
 #[structopt(version=VERSION, author=AUTHORS.split(";").nth(0).unwrap())]
@@ -137,7 +138,7 @@ enum Options {
     Info(Info),
     Exec(Exec),
     Report(Report),
-    Kuuid(Kuuid),
+    //    Kuuid(Kuuid),
 }
 
 #[allow(clippy::unnecessary_wraps)]
@@ -155,7 +156,7 @@ fn main() -> Result<()> {
         Options::Info(_) => info(backends),
         Options::Exec(e) => exec(backends, e),
         Options::Report(e) => measure(backends, e),
-        Options::Kuuid(k) => kuuid(backends, k),
+        //Options::Kuuid(k) => kuuid(backends, k),
     }
 }
 
@@ -191,12 +192,14 @@ fn info(backends: &[Box<dyn Backend>]) -> Result<()> {
     Ok(())
 }
 
+/*
 fn kuuid(_backends: &[Box<dyn Backend>], kuuid: Kuuid) -> Result<()> {
     //currently a stub
     //TODO - add execution
     println!("Kuuid received {:?}", kuuid.kuuid);
     Ok(())
 }
+*/
 
 #[allow(unreachable_code)]
 #[allow(clippy::unnecessary_wraps)]
