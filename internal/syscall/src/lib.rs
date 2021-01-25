@@ -188,6 +188,14 @@ pub trait SyscallHandler: AddressValidator + Sized {
                 self.accept4(usize::from(a) as _, b.into(), c.into(), usize::from(d) as _)
             }
             libc::SYS_connect => self.connect(usize::from(a) as _, b.into(), c.into()),
+            libc::SYS_eventfd2 => self.eventfd2(usize::from(a) as _, usize::from(b) as _),
+            libc::SYS_dup => self.dup(usize::from(a) as _),
+            libc::SYS_dup2 => self.dup2(usize::from(a) as _, usize::from(b) as _),
+            libc::SYS_dup3 => self.dup3(
+                usize::from(a) as _,
+                usize::from(b) as _,
+                usize::from(c) as _,
+            ),
             libc::SYS_recvfrom => self.recvfrom(
                 usize::from(a) as _,
                 b.into(),
@@ -1192,5 +1200,29 @@ pub trait SyscallHandler: AddressValidator + Sized {
         _sigmask: UntrustedRef<libc::sigset_t>,
     ) -> Result {
         self.epoll_wait(epfd, event, maxevents, timeout)
+    }
+
+    /// syscall
+    fn eventfd2(&mut self, initval: libc::c_uint, flags: libc::c_int) -> Result {
+        self.trace("eventfd2", 2);
+        unsafe { self.proxy(request!(libc::SYS_eventfd2 => initval, flags)) }
+    }
+
+    /// syscall
+    fn dup(&mut self, oldfd: libc::c_int) -> Result {
+        self.trace("dup", 1);
+        unsafe { self.proxy(request!(libc::SYS_dup => oldfd)) }
+    }
+
+    /// syscall
+    fn dup2(&mut self, oldfd: libc::c_int, newfd: libc::c_int) -> Result {
+        self.trace("dup2", 2);
+        unsafe { self.proxy(request!(libc::SYS_dup2 => oldfd, newfd)) }
+    }
+
+    /// syscall
+    fn dup3(&mut self, oldfd: libc::c_int, newfd: libc::c_int, flags: libc::c_int) -> Result {
+        self.trace("dup3", 3);
+        unsafe { self.proxy(request!(libc::SYS_dup3 => oldfd, newfd, flags)) }
     }
 }

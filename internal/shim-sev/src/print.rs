@@ -12,7 +12,7 @@ use core::sync::atomic::Ordering;
 
 // FIXME: remove, if https://github.com/enarx/enarx/issues/831 is fleshed out
 /// Global flag allowing debug output.
-pub const TRACE: bool = false;
+pub const TRACE: bool = true;
 
 impl fmt::Write for HostWrite {
     #[inline(always)]
