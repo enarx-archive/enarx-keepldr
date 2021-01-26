@@ -16,7 +16,7 @@ keywords = [
 
 [dependencies]
 libc = { version = "0.2", features = [] }
-primordial = "0.1"
+primordial = { git = "https://github.com/enarx/primordial" }
 
 [features]
 default = ["std"]

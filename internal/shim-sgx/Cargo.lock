@@ -85,6 +85,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "979d94833957a6485c5cac4b71d552a9cd0b9f3f6fd1c7c5dc8096b3ee2bcd13"
 
 [[package]]
+name = "primordial"
+version = "0.2.0"
+source = "git+https://github.com/enarx/primordial#c7eec07d344180ef96534dd95a1d6f113a6c6bbd"
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -115,7 +120,7 @@ name = "sallyport"
 version = "0.1.0"
 dependencies = [
  "libc",
- "primordial",
+ "primordial 0.2.0",
 ]
 
 [[package]]
@@ -132,7 +137,7 @@ dependencies = [
  "bitflags",
  "cc",
  "lset",
- "primordial",
+ "primordial 0.1.0",
  "xsave",
 ]
 
@@ -142,7 +147,7 @@ version = "0.1.0"
 dependencies = [
  "libc",
  "lset",
- "primordial",
+ "primordial 0.2.0",
 ]
 
 [[package]]
@@ -156,7 +161,7 @@ dependencies = [
  "libc",
  "lset",
  "nbytes",
- "primordial",
+ "primordial 0.2.0",
  "rcrt1",
  "sallyport",
  "sgx",
@@ -182,7 +187,7 @@ name = "syscall"
 version = "0.1.0"
 dependencies = [
  "libc",
- "primordial",
+ "primordial 0.2.0",
  "sallyport",
  "untrusted",
 ]
@@ -197,7 +202,7 @@ checksum = "f7fe0bb3479651439c9112f72b6c505038574c9fbb575ed1bf3b797fa39dd564"
 name = "untrusted"
 version = "0.1.0"
 dependencies = [
- "primordial",
+ "primordial 0.2.0",
 ]
 
 [[package]]
