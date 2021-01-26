@@ -4,7 +4,7 @@
 
 int main(void) {
     // TODO: Good buffer length?
-    unsigned char nonce[512];
+    unsigned char nonce[64];
     unsigned char buf[4598];
     size_t technology;
 

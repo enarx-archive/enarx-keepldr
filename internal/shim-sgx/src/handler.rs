@@ -381,16 +381,13 @@ impl<'a> MemorySyscallHandler for Handler<'a> {
 }
 
 impl<'a> EnarxSyscallHandler for Handler<'a> {
-    // Stub for get_attestation() pseudo syscall
-    // See: https://github.com/enarx/enarx-keepldr/issues/31
-    // NOTE: The Report will never be passed in from the code layer,
-    // so the nonce fields are not useful from the code --> shim in SGX.
-    // But SEV also uses this function signature and needs these fields.
-    // So we throw these two parameters away.
+    // NOTE: The 'nonce' field is called 'hash' here, as it is used to pass in
+    // a hash of a public key from the client that is to be embedded in the Quote.
+    // For more on this syscall, see: https://github.com/enarx/enarx-keepldr/issues/31
     fn get_attestation(
         &mut self,
-        _: UntrustedRef<u8>,
-        _: libc::size_t,
+        hash: UntrustedRef<u8>,
+        hash_len: libc::size_t,
         buf: UntrustedRefMut<u8>,
         buf_len: libc::size_t,
     ) -> sallyport::Result {
@@ -401,6 +398,19 @@ impl<'a> EnarxSyscallHandler for Handler<'a> {
 
         // Validate output buf memory
         let buf = buf.validate_slice(buf_len, self).ok_or(libc::EFAULT)?;
+
+        // hash may be a NULL ptr, but if it's not, check the length
+        let hash = match hash.validate_slice(hash_len, self) {
+            Some(h) => {
+                if h.len() != 64 {
+                    return Err(libc::EINVAL);
+                }
+                let mut array = [0u8; 64];
+                array.copy_from_slice(h);
+                array
+            }
+            None => [0u8; 64],
+        };
 
         // Request TargetInfo from host by passing nonce as 0
         let c = self.new_cursor();
@@ -440,8 +450,7 @@ impl<'a> EnarxSyscallHandler for Handler<'a> {
         );
         target_info.mrenclave.copy_from_slice(&ti[0..32]);
         target_info.attributes = att;
-        let data = ReportData([0u8; 64]);
-        let report: Report = unsafe { target_info.get_report(&data) };
+        let report: Report = unsafe { target_info.get_report(&ReportData(hash)) };
 
         // Request Quote from host
         let report_slice = &[report];
