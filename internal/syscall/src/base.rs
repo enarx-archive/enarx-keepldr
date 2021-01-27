@@ -2,6 +2,7 @@
 
 //! basic syscall handler functions
 
+use core::fmt;
 use primordial::Register;
 use sallyport::{Cursor, Request, Result};
 
@@ -38,4 +39,7 @@ pub trait BaseSyscallHandler {
 
     /// Output tracing information about the syscall
     fn trace(&mut self, name: &str, argc: usize);
+
+    /// Log debug output
+    fn log(&mut self, _args: fmt::Arguments) {}
 }
