@@ -2,21 +2,30 @@
 
 //! network syscalls
 
-use crate::BaseSyscallHandler;
+use crate::{BaseSyscallHandler, FdHandler};
 use sallyport::{request, Block, Result};
 use untrusted::{AddressValidator, UntrustedRef, UntrustedRefMut, Validate, ValidateSlice};
 
 /// network syscalls
-pub trait NetworkSyscallHandler: BaseSyscallHandler + AddressValidator + Sized {
+pub trait NetworkSyscallHandler: BaseSyscallHandler + FdHandler + AddressValidator + Sized {
     /// syscall
     fn socket(&mut self, domain: libc::c_int, type_: libc::c_int, protocol: libc::c_int) -> Result {
         self.trace("socket", 3);
-        unsafe { self.proxy(request!(libc::SYS_socket => domain, type_, protocol)) }
+        let ret = unsafe { self.proxy(request!(libc::SYS_socket => domain, type_, protocol))? };
+
+        // register valid fd
+        self.fd_register(usize::from(ret[0]) as _);
+
+        Ok(ret)
     }
 
     /// syscall
     fn bind(&mut self, fd: libc::c_int, addr: UntrustedRef<u8>, addrlen: libc::size_t) -> Result {
         self.trace("bind", 3);
+
+        // check if operation is allowed on this fd
+        let _ = self.fd_is_valid(fd)?;
+
         if addrlen > Block::buf_capacity() {
             return Err(libc::EINVAL);
         }
@@ -34,6 +43,9 @@ pub trait NetworkSyscallHandler: BaseSyscallHandler + AddressValidator + Sized {
     /// syscall
     fn listen(&mut self, sockfd: libc::c_int, backlog: libc::c_int) -> Result {
         self.trace("listen", 2);
+        // check if operation is allowed on this fd
+        let _ = self.fd_is_valid(sockfd)?;
+
         unsafe { self.proxy(request!(libc::SYS_listen => sockfd, backlog)) }
     }
 
@@ -45,6 +57,9 @@ pub trait NetworkSyscallHandler: BaseSyscallHandler + AddressValidator + Sized {
         addrlen: UntrustedRefMut<libc::socklen_t>,
     ) -> Result {
         self.trace("getsockname", 3);
+
+        // check if operation is allowed on this fd
+        let _ = self.fd_is_valid(fd)?;
 
         let addrlen = addrlen.validate(self).ok_or(libc::EFAULT)?;
 
@@ -100,6 +115,9 @@ pub trait NetworkSyscallHandler: BaseSyscallHandler + AddressValidator + Sized {
     ) -> Result {
         self.trace("accept4", 4);
 
+        // check if operation is allowed on this fd
+        let _ = self.fd_is_valid(fd)?;
+
         if addr.as_ptr().is_null() {
             return unsafe {
                 self.proxy(
@@ -139,6 +157,9 @@ pub trait NetworkSyscallHandler: BaseSyscallHandler + AddressValidator + Sized {
             *addrlen = block_addrlen;
         }
 
+        // register valid fd
+        self.fd_register(usize::from(ret[0]) as _);
+
         Ok(ret)
     }
 
@@ -150,6 +171,10 @@ pub trait NetworkSyscallHandler: BaseSyscallHandler + AddressValidator + Sized {
         addrlen: libc::size_t,
     ) -> Result {
         self.trace("connect", 3);
+
+        // check if operation is allowed on this fd
+        let _ = self.fd_is_valid(fd)?;
+
         if addrlen > Block::buf_capacity() {
             return Err(libc::EINVAL);
         }
@@ -175,6 +200,9 @@ pub trait NetworkSyscallHandler: BaseSyscallHandler + AddressValidator + Sized {
         addrlen: UntrustedRefMut<libc::socklen_t>,
     ) -> Result {
         self.trace("recvfrom", 6);
+
+        // check if operation is allowed on this fd
+        let _ = self.fd_is_valid(fd)?;
 
         // Limit the read to `Block::buf_capacity()`
         let count = usize::min(count, Block::buf_capacity());
@@ -266,6 +294,9 @@ pub trait NetworkSyscallHandler: BaseSyscallHandler + AddressValidator + Sized {
     ) -> Result {
         self.trace("sendto", 6);
 
+        // check if operation is allowed on this fd
+        let _ = self.fd_is_valid(sockfd)?;
+
         // Limit the write to `Block::buf_capacity()`
         let count = usize::min(count, Block::buf_capacity());
 
@@ -319,6 +350,9 @@ pub trait NetworkSyscallHandler: BaseSyscallHandler + AddressValidator + Sized {
         optlen: libc::socklen_t,
     ) -> Result {
         self.trace("setsockopt", 5);
+
+        // check if operation is allowed on this fd
+        let _ = self.fd_is_valid(sockfd)?;
 
         let optval = optval.validate_slice(optlen, self).ok_or(libc::EFAULT)?;
         let c = self.new_cursor();

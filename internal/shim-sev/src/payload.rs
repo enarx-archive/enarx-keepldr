@@ -9,6 +9,7 @@ use crate::shim_stack::init_stack_with_guard;
 use crate::usermode::usermode;
 use crate::{BOOT_INFO, PAYLOAD_READY};
 
+use crate::spin::RWLocked;
 use core::ops::DerefMut;
 use core::sync::atomic::Ordering;
 use crt0stack::{self, Builder, Entry};
@@ -61,6 +62,22 @@ pub static NEXT_MMAP_RWLOCK: Lazy<RwLock<VirtAddr>> = Lazy::new(|| {
     let mmap_start = mmap_start.align_up(Page::<Size4KiB>::SIZE);
 
     RwLock::<VirtAddr>::const_new(spinning::RawRwLock::const_new(), mmap_start)
+});
+
+/// The process context
+pub struct ProcessContext {
+    /// used file handles, one bit per fd, up to 65536
+    pub files: [u8; 8192],
+}
+
+/// The process context global variable
+pub static PROCESS_CONTEXT: Lazy<RWLocked<ProcessContext>> = Lazy::new(|| {
+    let mut ctx = ProcessContext { files: [0u8; 8192] };
+
+    // FIXME: might want to remove in the future
+    ctx.files[0] = 7; // validate fd 0, 1, 2
+
+    RWLocked::new(ctx)
 });
 
 /// load the elf binary

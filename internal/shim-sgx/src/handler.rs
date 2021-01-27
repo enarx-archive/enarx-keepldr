@@ -17,8 +17,9 @@ use sgx::{
     },
 };
 use sgx_heap::Heap;
+use spinning::Lazy;
 use syscall::{
-    BaseSyscallHandler, EnarxSyscallHandler, FileSyscallHandler, MemorySyscallHandler,
+    BaseSyscallHandler, EnarxSyscallHandler, FdHandler, FileSyscallHandler, MemorySyscallHandler,
     NetworkSyscallHandler, ProcessSyscallHandler, SyscallHandler, SystemSyscallHandler,
     ARCH_GET_FS, ARCH_GET_GS, ARCH_SET_FS, ARCH_SET_GS, SGX_DUMMY_QUOTE, SGX_DUMMY_TI,
     SGX_QUOTE_SIZE, SGX_TECH, SYS_ENARX_CPUID, SYS_ENARX_GETATT,
@@ -27,6 +28,7 @@ use untrusted::{AddressValidator, UntrustedRef, UntrustedRefMut, ValidateSlice};
 
 pub const TRACE: bool = false;
 use crate::enclave::{syscall, Context};
+use crate::spin::RWLocked;
 
 pub struct Handler<'a> {
     pub aex: &'a mut StateSaveArea,
@@ -125,6 +127,71 @@ impl<'a> AddressValidator for Handler<'a> {
 impl<'a> SyscallHandler for Handler<'a> {}
 impl<'a> SystemSyscallHandler for Handler<'a> {}
 impl<'a> NetworkSyscallHandler for Handler<'a> {}
+
+/// The process context
+pub struct ProcessContext {
+    /// used file handles, one bit per fd, up to 65536
+    pub files: [u8; 8192],
+}
+
+/// The process context global variable
+pub static PROCESS_CONTEXT: Lazy<RWLocked<ProcessContext>> = Lazy::new(|| {
+    let mut ctx = ProcessContext { files: [0u8; 8192] };
+
+    // FIXME: might want to remove in the future
+    ctx.files[0] = 7; // validate fd 0, 1, 2
+
+    RWLocked::new(ctx)
+});
+
+impl<'a> FdHandler for Handler<'a> {
+    fn fd_register(&mut self, fd: i32) {
+        let i: usize = (fd / 8) as _;
+        let b: u8 = 1u8 << (fd % 8);
+
+        let mut context = PROCESS_CONTEXT.write();
+
+        if context.files[i] & b != 0 {
+            panic!("Register already registered fd")
+        }
+
+        context.files[i] = context.files[i] | b;
+    }
+
+    fn fd_unregister(&mut self, fd: i32) {
+        let i: usize = (fd / 8) as _;
+        let b: u8 = 1u8 << (fd % 8);
+
+        let mut context = PROCESS_CONTEXT.write();
+
+        if context.files[i] & b == 0 {
+            panic!("Unregister not registered fd")
+        }
+
+        context.files[i] = context.files[i] & (!b);
+    }
+
+    fn fd_is_valid(&mut self, fd: i32) -> sallyport::Result {
+        let i: usize = (fd / 8) as _;
+        let b: u8 = 1u8 << (fd % 8);
+
+        let context = PROCESS_CONTEXT.read();
+
+        if context.files[i] & b == 0 {
+            return Err(libc::EBADFD);
+        }
+
+        Ok(Default::default())
+    }
+
+    fn fd_epoll_ctl(&mut self, epfd: i32, op: i32, fd: i32, event: libc::epoll_event) {
+        unimplemented!()
+    }
+
+    fn fd_get_epoll_event_data(&mut self, epfd: i32, fd: i32) -> u64 {
+        unimplemented!()
+    }
+}
 
 impl<'a> BaseSyscallHandler for Handler<'a> {
     fn translate_shim_to_host_addr<T>(buf: *const T) -> usize {

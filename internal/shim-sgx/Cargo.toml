@@ -25,6 +25,7 @@ nbytes = "0.1"
 lset = "0.1"
 xsave = "0.1.1"
 const-default = { version = "0.1" }
+spinning = { version = "0.1", default-features = false }
 
 [profile.dev.package.rcrt1]
 opt-level = 3
