@@ -58,6 +58,7 @@
 
 mod backend;
 mod binary;
+mod netlink;
 mod protobuf;
 mod sallyport;
 mod syscall;
@@ -72,9 +73,11 @@ use anyhow::Result;
 use structopt::StructOpt;
 
 use std::ffi::CString;
-use std::io::Error;
+use std::io::{Error, ErrorKind};
+use std::net::IpAddr;
 use std::os::raw::c_char;
 use std::os::unix::ffi::OsStrExt;
+use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
 use std::ptr::null;
 
@@ -88,6 +91,10 @@ struct Info {}
 /// Executes a keep
 #[derive(StructOpt)]
 struct Exec {
+    /// Create a new IPVLAN for the keep
+    #[structopt(short, long)]
+    ipvlan: Option<IpAddr>,
+
     /// The socket to use for preattestation
     #[structopt(short, long)]
     sock: Option<PathBuf>,
@@ -188,6 +195,49 @@ fn measure(backends: &[Box<dyn Backend>], opts: Report) -> Result<()> {
 #[allow(unreachable_code)]
 #[allow(clippy::unnecessary_wraps)]
 fn exec(backends: &[Box<dyn Backend>], opts: Exec) -> Result<()> {
+    if let Some(addr) = opts.ipvlan {
+        fn find(addr: IpAddr) -> Result<netlink::Address, ErrorKind> {
+            for address in netlink::Address::list().unwrap() {
+                if address.subnet().contains(addr) && address.address() != addr {
+                    return Ok(address);
+                }
+            }
+
+            Err(ErrorKind::InvalidData)
+        }
+
+        // Save the original namespace
+        let curns = std::fs::File::open("/proc/self/ns/net").unwrap();
+
+        // Create the new namespace
+        nix::sched::unshare(nix::sched::CloneFlags::CLONE_NEWNET)
+            .expect("unable to create new network namespace");
+        let newns = std::fs::File::open("/proc/self/ns/net").unwrap();
+
+        // Swap back the original namespace
+        nix::sched::setns(curns.as_raw_fd(), nix::sched::CloneFlags::CLONE_NEWNET).unwrap();
+
+        // Create our macvlan interface in the new namespace
+        let address = find(addr).expect("unable to find matching subnet");
+        let mut iface = address.interface().expect("unable to find matching iface");
+        let ipvlan = iface.add_ipvlan("ipvl0").expect("error creating ipvlan");
+        ipvlan.move_to_namespace(newns.as_raw_fd()).unwrap();
+
+        // Swap to the new namespace and destroy the old one
+        nix::sched::setns(newns.as_raw_fd(), nix::sched::CloneFlags::CLONE_NEWNET).unwrap();
+        drop(curns);
+        drop(newns);
+
+        let mut ipvlan = netlink::Interface::find("ipvl0").expect("unable to find ipvlan");
+        ipvlan
+            .add_address(addr, address.subnet().prefix())
+            .expect("unable to add address");
+        ipvlan.up().expect("unable to bring up ipvlan");
+        ipvlan
+            .add_gateway(address.address())
+            .expect("unable to add gatweay to ipvlan");
+    }
+
     let keep = std::env::var_os("ENARX_BACKEND").map(|x| x.into_string().unwrap());
 
     let backend = backends
