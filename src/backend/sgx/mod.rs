@@ -45,7 +45,7 @@ impl From<crate::binary::Segment> for Segment {
         Self {
             si: SecInfo::reg(rwx),
             dst: value.dst,
-            src: value.src,
+            src: unsafe { std::mem::transmute(value.src) },
         }
     }
 }
@@ -104,31 +104,37 @@ impl crate::backend::Backend for Backend {
             Segment {
                 si: SecInfo::tcs(),
                 dst: layout.prefix.start,
-                src: vec![Page::copy(tcs)],
+                src: vec![unsafe { std::mem::transmute(Page::copy(tcs)) }],
             },
             // Layout
             Segment {
                 si: SecInfo::reg(Flags::R),
                 dst: layout.prefix.start + Page::size(),
-                src: vec![Page::copy(layout)],
+                src: vec![unsafe { std::mem::transmute(Page::copy(layout)) }],
             },
             // SSAs
             Segment {
                 si: SecInfo::reg(Flags::R | Flags::W),
                 dst: layout.prefix.start + Page::size() * 2,
-                src: ssas,
+                src: unsafe { std::mem::transmute(ssas) },
             },
             // Heap
             Segment {
                 si: SecInfo::reg(Flags::R | Flags::W | Flags::X),
                 dst: layout.heap.start,
-                src: vec![Page::default(); Span::from(layout.heap).count / Page::size()],
+                src: vec![
+                    unsafe { std::mem::transmute(Page::default()) };
+                    Span::from(layout.heap).count / Page::size()
+                ],
             },
             // Stack
             Segment {
                 si: SecInfo::reg(Flags::R | Flags::W),
                 dst: layout.stack.start,
-                src: vec![Page::default(); Span::from(layout.stack).count / Page::size()],
+                src: vec![
+                    unsafe { std::mem::transmute(Page::default()) };
+                    Span::from(layout.stack).count / Page::size()
+                ],
             },
         ];
 

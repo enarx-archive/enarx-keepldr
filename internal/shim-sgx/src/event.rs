@@ -31,21 +31,21 @@ pub extern "C" fn event(
             match unsafe { h.aex.gpr.rip.into_slice(2usize) } {
                 OP_SYSCALL => {
                     let ret = h.syscall(
-                        h.aex.gpr.rdi.into(),
-                        h.aex.gpr.rsi.into(),
-                        h.aex.gpr.rdx.into(),
-                        h.aex.gpr.r10.into(),
-                        h.aex.gpr.r8.into(),
-                        h.aex.gpr.r9.into(),
-                        h.aex.gpr.rax.into(),
+                        usize::from(h.aex.gpr.rdi).into(),
+                        usize::from(h.aex.gpr.rsi).into(),
+                        usize::from(h.aex.gpr.rdx).into(),
+                        usize::from(h.aex.gpr.r10).into(),
+                        usize::from(h.aex.gpr.r8).into(),
+                        usize::from(h.aex.gpr.r9).into(),
+                        usize::from(h.aex.gpr.rax).into(),
                     );
 
                     aex.gpr.rip = (usize::from(aex.gpr.rip) + 2).into();
                     match ret {
                         Err(e) => aex.gpr.rax = (-e).into(),
                         Ok([rax, rdx]) => {
-                            aex.gpr.rax = rax.into();
-                            aex.gpr.rdx = rdx.into();
+                            aex.gpr.rax = usize::from(rax).into();
+                            aex.gpr.rdx = usize::from(rdx).into();
                         }
                     }
                 }

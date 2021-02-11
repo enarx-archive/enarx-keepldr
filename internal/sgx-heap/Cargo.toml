@@ -10,5 +10,5 @@ publish = false
 
 [dependencies]
 libc = { version = "0.2", default-features = false }
-primordial = "0.1"
+primordial = { git = "https://github.com/enarx/primordial" }
 lset = "0.1"

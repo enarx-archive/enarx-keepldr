@@ -12,4 +12,4 @@ publish = false
 sallyport = { path = "../sallyport", default-features = false }
 untrusted = { path = "../untrusted"}
 libc = { version = "0.2", features = [] }
-primordial = "0.1"
+primordial = { git = "https://github.com/enarx/primordial" }

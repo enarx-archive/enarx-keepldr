@@ -87,26 +87,36 @@ pub trait SyscallHandler:
             libc::SYS_mmap => self.mmap(
                 a.into(),
                 b.into(),
-                c.try_into().map_err(|_| libc::EINVAL)?,
-                usize::from(d) as _,
-                usize::from(e) as _,
+                c.try_into().or(Err(libc::EINVAL))?,
+                d.try_into().or(Err(libc::EINVAL))?,
+                e.try_into().or(Err(libc::EINVAL))?,
                 f.into(),
             ),
             libc::SYS_munmap => self.munmap(a.into(), b.into()),
-            libc::SYS_madvise => self.madvise(a.into(), b.into(), usize::from(c) as _),
-            libc::SYS_mprotect => self.mprotect(a.into(), b.into(), usize::from(c) as _),
+            libc::SYS_madvise => {
+                self.madvise(a.into(), b.into(), c.try_into().or(Err(libc::EINVAL))?)
+            }
+            libc::SYS_mprotect => {
+                self.mprotect(a.into(), b.into(), c.try_into().or(Err(libc::EINVAL))?)
+            }
 
             // ProcessSyscallHandler
-            libc::SYS_arch_prctl => self.arch_prctl(usize::from(a) as _, b.into()),
-            libc::SYS_exit => self.exit(usize::from(a) as _),
-            libc::SYS_exit_group => self.exit_group(usize::from(a) as _),
+            libc::SYS_arch_prctl => self.arch_prctl(a.try_into().or(Err(libc::EINVAL))?, b.into()),
+            libc::SYS_exit => self.exit(a.try_into().or(Err(libc::EINVAL))?),
+            libc::SYS_exit_group => self.exit_group(a.try_into().or(Err(libc::EINVAL))?),
             libc::SYS_set_tid_address => self.set_tid_address(a.into()),
-            libc::SYS_rt_sigaction => {
-                self.rt_sigaction(usize::from(a) as _, b.into(), c.into(), d.into())
-            }
-            libc::SYS_rt_sigprocmask => {
-                self.rt_sigprocmask(usize::from(a) as _, b.into(), c.into(), d.into())
-            }
+            libc::SYS_rt_sigaction => self.rt_sigaction(
+                a.try_into().or(Err(libc::EINVAL))?,
+                b.into(),
+                c.into(),
+                d.into(),
+            ),
+            libc::SYS_rt_sigprocmask => self.rt_sigprocmask(
+                a.try_into().or(Err(libc::EINVAL))?,
+                b.into(),
+                c.into(),
+                d.into(),
+            ),
             libc::SYS_sigaltstack => self.sigaltstack(a.into(), b.into()),
             libc::SYS_getpid => self.getpid(),
             libc::SYS_getuid => self.getuid(),
@@ -115,44 +125,56 @@ pub trait SyscallHandler:
             libc::SYS_getegid => self.getegid(),
 
             // SystemSyscallHandler
-            libc::SYS_getrandom => self.getrandom(a.into(), b.into(), usize::from(c) as _),
-            libc::SYS_clock_gettime => self.clock_gettime(usize::from(a) as _, b.into()),
+            libc::SYS_getrandom => {
+                self.getrandom(a.into(), b.into(), c.try_into().or(Err(libc::EINVAL))?)
+            }
+            libc::SYS_clock_gettime => {
+                self.clock_gettime(a.try_into().or(Err(libc::EINVAL))?, b.into())
+            }
             libc::SYS_uname => self.uname(a.into()),
 
             // FileSyscallHandler
-            libc::SYS_close => self.close(a.try_into().map_err(|_| libc::EINVAL)?),
-            libc::SYS_read => self.read(usize::from(a) as _, b.into(), c.into()),
-            libc::SYS_readv => self.readv(usize::from(a) as _, b.into(), usize::from(c) as _),
-            libc::SYS_write => self.write(usize::from(a) as _, b.into(), c.into()),
-            libc::SYS_writev => self.writev(usize::from(a) as _, b.into(), usize::from(c) as _),
-            libc::SYS_ioctl => self.ioctl(usize::from(a) as _, b.into(), c.into()),
-            libc::SYS_readlink => self.readlink(a.into(), b.into(), c.into()),
-            libc::SYS_fstat => self.fstat(usize::from(a) as _, b.into()),
-            libc::SYS_fcntl => self.fcntl(
-                usize::from(a) as _,
-                usize::from(b) as _,
-                usize::from(c) as _,
+            libc::SYS_close => self.close(a.try_into().or(Err(libc::EINVAL))?),
+            libc::SYS_read => self.read(a.try_into().or(Err(libc::EINVAL))?, b.into(), c.into()),
+            libc::SYS_readv => self.readv(
+                a.try_into().or(Err(libc::EINVAL))?,
+                b.into(),
+                c.try_into().or(Err(libc::EINVAL))?,
             ),
-            libc::SYS_poll => self.poll(a.into(), b.into(), usize::from(c) as _),
+            libc::SYS_write => self.write(a.try_into().or(Err(libc::EINVAL))?, b.into(), c.into()),
+            libc::SYS_writev => self.writev(
+                a.try_into().or(Err(libc::EINVAL))?,
+                b.into(),
+                c.try_into().or(Err(libc::EINVAL))?,
+            ),
+            libc::SYS_ioctl => self.ioctl(a.try_into().or(Err(libc::EINVAL))?, b.into(), c.into()),
+            libc::SYS_readlink => self.readlink(a.into(), b.into(), c.into()),
+            libc::SYS_fstat => self.fstat(a.try_into().or(Err(libc::EINVAL))?, b.into()),
+            libc::SYS_fcntl => self.fcntl(
+                a.try_into().or(Err(libc::EINVAL))?,
+                b.try_into().or(Err(libc::EINVAL))?,
+                c.try_into().or(Err(libc::EINVAL))?,
+            ),
+            libc::SYS_poll => self.poll(a.into(), b.into(), c.try_into().or(Err(libc::EINVAL))?),
             libc::SYS_pipe => self.pipe(a.into()),
-            libc::SYS_epoll_create1 => self.epoll_create1(a.try_into().map_err(|_| libc::EINVAL)?),
+            libc::SYS_epoll_create1 => self.epoll_create1(a.try_into().or(Err(libc::EINVAL))?),
             libc::SYS_epoll_ctl => self.epoll_ctl(
-                usize::from(a) as _,
-                usize::from(b) as _,
-                usize::from(c) as _,
+                a.try_into().or(Err(libc::EINVAL))?,
+                b.try_into().or(Err(libc::EINVAL))?,
+                c.try_into().or(Err(libc::EINVAL))?,
                 d.into(),
             ),
             libc::SYS_epoll_wait => self.epoll_wait(
-                usize::from(a) as _,
+                a.try_into().or(Err(libc::EINVAL))?,
                 b.into(),
-                usize::from(c) as _,
-                usize::from(d) as _,
+                c.try_into().or(Err(libc::EINVAL))?,
+                d.try_into().or(Err(libc::EINVAL))?,
             ),
             libc::SYS_epoll_pwait => self.epoll_pwait(
-                usize::from(a) as _,
+                a.try_into().or(Err(libc::EINVAL))?,
                 b.into(),
-                usize::from(c) as _,
-                usize::from(d) as _,
+                c.try_into().or(Err(libc::EINVAL))?,
+                d.try_into().or(Err(libc::EINVAL))?,
                 e.into(),
             ),
             libc::SYS_eventfd2 => self.eventfd2(usize::from(a) as _, usize::from(b) as _),
@@ -166,40 +188,52 @@ pub trait SyscallHandler:
 
             // NetworkSyscallHandler
             libc::SYS_socket => self.socket(
-                usize::from(a) as _,
-                usize::from(b) as _,
-                usize::from(c) as _,
+                a.try_into().or(Err(libc::EINVAL))?,
+                b.try_into().or(Err(libc::EINVAL))?,
+                c.try_into().or(Err(libc::EINVAL))?,
             ),
-            libc::SYS_bind => self.bind(usize::from(a) as _, b.into(), c.into()),
-            libc::SYS_listen => self.listen(usize::from(a) as _, usize::from(b) as _),
-            libc::SYS_getsockname => self.getsockname(usize::from(a) as _, b.into(), c.into()),
-            libc::SYS_accept => self.accept(usize::from(a) as _, b.into(), c.into()),
-            libc::SYS_accept4 => {
-                self.accept4(usize::from(a) as _, b.into(), c.into(), usize::from(d) as _)
+            libc::SYS_bind => self.bind(a.try_into().or(Err(libc::EINVAL))?, b.into(), c.into()),
+            libc::SYS_listen => self.listen(
+                a.try_into().or(Err(libc::EINVAL))?,
+                b.try_into().or(Err(libc::EINVAL))?,
+            ),
+            libc::SYS_getsockname => {
+                self.getsockname(a.try_into().or(Err(libc::EINVAL))?, b.into(), c.into())
             }
-            libc::SYS_connect => self.connect(usize::from(a) as _, b.into(), c.into()),
-            libc::SYS_recvfrom => self.recvfrom(
-                usize::from(a) as _,
+            libc::SYS_accept => {
+                self.accept(a.try_into().or(Err(libc::EINVAL))?, b.into(), c.into())
+            }
+            libc::SYS_accept4 => self.accept4(
+                a.try_into().or(Err(libc::EINVAL))?,
                 b.into(),
                 c.into(),
-                usize::from(d) as _,
+                d.try_into().or(Err(libc::EINVAL))?,
+            ),
+            libc::SYS_connect => {
+                self.connect(a.try_into().or(Err(libc::EINVAL))?, b.into(), c.into())
+            }
+            libc::SYS_recvfrom => self.recvfrom(
+                a.try_into().or(Err(libc::EINVAL))?,
+                b.into(),
+                c.into(),
+                d.try_into().or(Err(libc::EINVAL))?,
                 e.into(),
                 f.into(),
             ),
             libc::SYS_sendto => self.sendto(
-                usize::from(a) as _,
+                a.try_into().or(Err(libc::EINVAL))?,
                 b.into(),
                 c.into(),
-                usize::from(d) as _,
+                d.try_into().or(Err(libc::EINVAL))?,
                 e.into(),
                 f.into(),
             ),
             libc::SYS_setsockopt => self.setsockopt(
-                usize::from(a) as _,
-                usize::from(b) as _,
-                usize::from(c) as _,
+                a.try_into().or(Err(libc::EINVAL))?,
+                b.try_into().or(Err(libc::EINVAL))?,
+                c.try_into().or(Err(libc::EINVAL))?,
                 d.into(),
-                usize::from(e) as _,
+                e.try_into().or(Err(libc::EINVAL))?,
             ),
 
             SYS_ENARX_GETATT => self.get_attestation(a.into(), b.into(), c.into(), d.into()),
