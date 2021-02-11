@@ -765,7 +765,7 @@ dependencies = [
 [[package]]
 name = "sgx"
 version = "0.1.0"
-source = "git+https://github.com/enarx/sgx?rev=e805b51#e805b514b34dfd206305f95ddff992b7a2462fc2"
+source = "git+https://github.com/lkatalin/sgx?branch=hasher#3b6f8ff440b53678493e03952f2c9a270d247b7a"
 dependencies = [
  "bitflags",
  "cc",

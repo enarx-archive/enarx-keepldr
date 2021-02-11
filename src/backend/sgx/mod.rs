@@ -7,13 +7,11 @@ use crate::sallyport;
 use crate::syscall::{SYS_ENARX_CPUID, SYS_ENARX_ERESUME, SYS_ENARX_GETATT};
 
 use anyhow::{anyhow, Result};
-use lset::Span;
-use primordial::Page;
-use sgx::enclave::{Builder, Enclave, Entry, Registers, Segment};
+use sgx::enclave::{Enclave, Entry, Registers, Segment};
 use sgx::types::{
     page::{Flags, SecInfo},
+    sig::{Author, Parameters},
     ssa::Exception,
-    tcs::Tcs,
 };
 
 use std::arch::x86_64::__cpuid_count;
@@ -21,7 +19,10 @@ use std::convert::TryInto;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 
+use openssl::{bn, rsa};
+
 mod attestation;
+mod builder;
 mod data;
 mod shim;
 
@@ -73,78 +74,26 @@ impl crate::backend::Backend for Backend {
     }
 
     /// Create a keep instance on this backend
-    fn build(&self, mut code: Component, _sock: Option<&Path>) -> Result<Arc<dyn Keep>> {
-        let mut shim = Component::from_bytes(SHIM)?;
-
-        // Calculate the memory layout for the enclave.
-        let layout = crate::backend::sgx::shim::Layout::calculate(shim.region(), code.region());
-
-        // Relocate the shim binary.
-        shim.entry += layout.shim.start;
-        for seg in shim.segments.iter_mut() {
-            seg.dst += layout.shim.start;
-        }
-
-        // Relocate the code binary.
-        code.entry += layout.code.start;
-        for seg in code.segments.iter_mut() {
-            seg.dst += layout.code.start;
-        }
-
-        // Create SSAs and TCS.
-        let ssas = vec![Page::default(); 2];
-        let tcs = Tcs::new(
-            shim.entry - layout.enclave.start,
-            Page::size() * 2, // SSAs after Layout (see below)
-            ssas.len() as _,
-        );
-
-        let internal = vec![
-            // TCS
-            Segment {
-                si: SecInfo::tcs(),
-                dst: layout.prefix.start,
-                src: vec![Page::copy(tcs)],
-            },
-            // Layout
-            Segment {
-                si: SecInfo::reg(Flags::R),
-                dst: layout.prefix.start + Page::size(),
-                src: vec![Page::copy(layout)],
-            },
-            // SSAs
-            Segment {
-                si: SecInfo::reg(Flags::R | Flags::W),
-                dst: layout.prefix.start + Page::size() * 2,
-                src: ssas,
-            },
-            // Heap
-            Segment {
-                si: SecInfo::reg(Flags::R | Flags::W | Flags::X),
-                dst: layout.heap.start,
-                src: vec![Page::default(); Span::from(layout.heap).count / Page::size()],
-            },
-            // Stack
-            Segment {
-                si: SecInfo::reg(Flags::R | Flags::W),
-                dst: layout.stack.start,
-                src: vec![Page::default(); Span::from(layout.stack).count / Page::size()],
-            },
-        ];
-
-        let shim_segs: Vec<_> = shim.segments.into_iter().map(Segment::from).collect();
-        let code_segs: Vec<_> = code.segments.into_iter().map(Segment::from).collect();
-
-        // Initiate the enclave building process.
-        let mut builder = Builder::new(layout.enclave).expect("Unable to create builder");
-        builder.load(&internal)?;
-        builder.load(&shim_segs)?;
-        builder.load(&code_segs)?;
+    fn build(&self, code: Component, _sock: Option<&Path>) -> Result<Arc<dyn Keep>> {
+        let shim = Component::from_bytes(SHIM)?;
+        let builder = builder::builder(shim, code)?;
         Ok(builder.build()?)
     }
 
-    fn measure(&self, mut _code: Component) -> Result<String> {
-        unimplemented!()
+    fn measure(&self, code: Component) -> Result<String> {
+        let shim = Component::from_bytes(SHIM)?;
+
+        let builder = builder::builder(shim, code)?;
+
+        // Use Builder's hasher to get enclave measurement.
+        let hasher = builder.hasher();
+        let vendor = Author::new(0, 0);
+        let exp = bn::BigNum::from_u32(3u32)?;
+        let key = rsa::Rsa::generate_with_e(3072, &exp)?;
+        let sig = hasher.finish(Parameters::default()).sign(vendor, key)?;
+        let mrenclave = sig.measurement().mrenclave();
+        let json = format!(r#"{{ "backend": "sgx", "mrenclave": {:?} }}"#, mrenclave);
+        Ok(json)
     }
 }
 
