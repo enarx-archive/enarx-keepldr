@@ -92,6 +92,9 @@ pub trait SyscallHandler:
                 usize::from(e) as _,
                 f.into(),
             ),
+            libc::SYS_mremap => {
+                self.mremap(a.into(), b.into(), c.into(), usize::from(d) as _, e.into())
+            }
             libc::SYS_munmap => self.munmap(a.into(), b.into()),
             libc::SYS_madvise => self.madvise(a.into(), b.into(), usize::from(c) as _),
             libc::SYS_mprotect => self.mprotect(a.into(), b.into(), usize::from(c) as _),
