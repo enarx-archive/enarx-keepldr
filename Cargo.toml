@@ -59,7 +59,7 @@ protobuf-codegen-pure = "2.22"
 sallyport = { git = "https://github.com/enarx/sallyport", rev = "efccf0f" }
 
 [dev-dependencies]
-process_control = "3.0"
+process_control = "3.1"
 serial_test = "0.5"
 tempdir = "0.3.7"
 
