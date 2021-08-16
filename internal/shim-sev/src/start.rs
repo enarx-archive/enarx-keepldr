@@ -26,6 +26,7 @@ static INITIAL_SHIM_STACK: [Page; INITIAL_STACK_PAGES] = [Page::zeroed(); INITIA
 /// * %rdi  = address of SYSCALL_PAGE (boot_info)
 /// * %rsi  = shim load offset
 #[allow(clippy::integer_arithmetic)]
+#[warn(named_asm_labels)]
 #[no_mangle]
 #[naked]
 pub unsafe extern "sysv64" fn _start() -> ! {
@@ -39,21 +40,21 @@ pub unsafe extern "sysv64" fn _start() -> ! {
     // Intel CPUs supports this CPUID leaf then we are guranteed to have exact
     // same bit definition.
     cmp     eax,    0x8000001f
-    jl      NoSev
+    jl      .LnoSev
 
     // Check for memory encryption feature:
     //  CPUID  Fn8000_001F[EAX] - Bit 1
     mov     eax,    0x8000001f
     cpuid
     bt      eax,    1
-    jnc     NoSev
+    jnc     .LnoSev
 
     // Check if memory encryption is enabled
     //  MSR_0xC0010131 - Bit 0 (SEV enabled)
     mov     ecx,    0xc0010131
     rdmsr
     bt      eax,    0
-    jnc     NoSev
+    jnc     .LnoSev
 
     // Get pte bit position to enable memory encryption
     // CPUID Fn8000_001F[EBX] - Bits 5:0
@@ -62,12 +63,12 @@ pub unsafe extern "sysv64" fn _start() -> ! {
 
     // If SEV is enabled, C-bit is always above 31
     bts     rdx,    rax
-    jmp     SevExit
+    jmp     .LsevExit
 
-NoSev:
+.LnoSev:
     xor     rdx,    rdx
 
-SevExit:
+.LsevExit:
     // backup edx to r11 and r12
     // r11: C-bit >> 32
     // r12: C-bit full 64bit mask
@@ -114,20 +115,20 @@ SevExit:
     mov     rdx,    r11
     mov     ecx,    512         // Counter to 512 page table entries
     add     rbx,    4           // Pre-advance pointer by 4 bytes for the higher 32bit
-setCBit_PDT_OFFSET:
+.LsetCBit_PDT_OFFSET:
     or      DWORD PTR [rbx],edx // set C-bit
     add     rbx,    8           // advance pointer by 8
-    loop    setCBit_PDT_OFFSET
+    loop    .LsetCBit_PDT_OFFSET
 
     // set C-bit in all entries of the PDPT_OFFSET table
     lea     rbx,    [rip + {PDPT_OFFSET}]
     mov     rdx,    r11
     mov     ecx,    512         // Counter to 512 page table entries
     add     rbx,    4           // Pre-advance pointer by 4 bytes for the higher 32bit
-setCBit_PDPT_OFFSET:
+.LsetCBit_PDPT_OFFSET:
     or      DWORD PTR [rbx],edx // set C-bit
     add     rbx,    8           // advance pointer by 8
-    loop    setCBit_PDPT_OFFSET
+    loop    .LsetCBit_PDPT_OFFSET
 
     // setup PDPT_OFFSET table entry 0 with PDT_OFFSET table
     lea     rbx,    [rip + {PDPT_OFFSET}]
@@ -163,12 +164,12 @@ setCBit_PDPT_OFFSET:
     mov     cr3,    rax
 
     // advance rip to kernel address space with {SHIM_VIRT_OFFSET}
-    lea     rax,    [rip + _trampoline]
+    lea     rax,    [rip + .Ltrampoline]
     mov     rbx,    {SHIM_VIRT_OFFSET}
     adox    rax,    rbx
     jmp     rax
 
-_trampoline:
+.Ltrampoline:
     mov     r15,    {SHIM_VIRT_OFFSET}
     //  add {SHIM_VIRT_OFFSET} to shim load offset
     adox    rsi,    r15
