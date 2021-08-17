@@ -41,7 +41,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: ${{ matrix.crate.target }} --all-features --manifest-path=${{ matrix.crate.path }} -- -D warnings
+          args: ${{ matrix.crate.target }} --all-features --manifest-path=${{ matrix.crate.path }}
     strategy:
       fail-fast: false
       matrix:
@@ -71,11 +71,11 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: ${{ matrix.profile.flag }} --no-default-features --features=backend-${{ matrix.backend.name }} -- -D warnings
+          args: ${{ matrix.profile.flag }} --no-default-features --features=backend-${{ matrix.backend.name }}
       - uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: ${{ matrix.profile.flag }} --no-default-features --features=backend-${{ matrix.backend.name }} --examples -- -D warnings
+          args: ${{ matrix.profile.flag }} --no-default-features --features=backend-${{ matrix.backend.name }} --examples
     strategy:
       fail-fast: false
       matrix:
