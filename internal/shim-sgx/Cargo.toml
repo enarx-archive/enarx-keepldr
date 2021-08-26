@@ -20,7 +20,7 @@ crt0stack = { version = "0.1", default-features = false }
 libc = { version = "0.2", default-features = false }
 primordial = "0.1"
 nbytes = "0.1"
-lset = "0.1"
+lset = "0.2"
 xsave = "0.1.1"
 const-default = { version = "0.1" }
 
