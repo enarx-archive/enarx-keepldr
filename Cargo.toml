@@ -48,7 +48,7 @@ nbytes = "0.1"
 anyhow = "1.0"
 goblin = "0.4"
 libc = "0.2"
-lset = "0.1"
+lset = "0.2"
 protobuf = "2.22"
 openssl = "0.10"
 
