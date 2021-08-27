@@ -34,7 +34,7 @@ sgx = { git = "https://github.com/enarx/sgx", rev = "2f8837a3e27d787ad4d420c588b
 koine = { git = "https://github.com/enarx/koine", optional = true }
 x86_64 = { version = "0.11", default-features = false, features = ["stable"], optional = true }
 kvm-bindings = { version = "0.4", optional = true }
-kvm-ioctls = { version = "0.9", optional = true }
+kvm-ioctls = { version = "0.10", optional = true }
 primordial = "0.1"
 structopt = "0.3"
 iocuddle = "0.1"
