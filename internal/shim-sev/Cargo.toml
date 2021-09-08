@@ -18,7 +18,7 @@ goblin = { version = "0.4", default-features = false, features = [ "elf64" ] }
 crt0stack = { version = "0.1", default-features = false }
 spinning = { version = "0.1", default-features = false }
 libc = { version = "0.2", default-features = false }
-primordial = "0.1"
+primordial = "0.3"
 nbytes = "0.1"
 lset = "0.2"
 array-const-fn-init = "0.1"
