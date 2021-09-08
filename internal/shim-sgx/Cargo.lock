@@ -53,7 +53,7 @@ source = "git+https://github.com/enarx/enarx-heap?rev=6ecf48aa3db78a0cc17f32870c
 dependencies = [
  "libc",
  "lset",
- "primordial",
+ "primordial 0.1.0",
 ]
 
 [[package]]
@@ -97,6 +97,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "979d94833957a6485c5cac4b71d552a9cd0b9f3f6fd1c7c5dc8096b3ee2bcd13"
 
 [[package]]
+name = "primordial"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55d6312462222758b3fb6c7e84d819ce87c315c446e0e2c11b0b9258dedd3f25"
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -129,7 +135,7 @@ version = "0.1.0"
 source = "git+https://github.com/enarx/sallyport?rev=0d3f139366003b196f9c07c437f86d398c73a18c#0d3f139366003b196f9c07c437f86d398c73a18c"
 dependencies = [
  "libc",
- "primordial",
+ "primordial 0.1.0",
 ]
 
 [[package]]
@@ -146,7 +152,7 @@ dependencies = [
  "bitflags",
  "cc",
  "lset",
- "primordial",
+ "primordial 0.1.0",
  "xsave",
 ]
 
@@ -162,7 +168,7 @@ dependencies = [
  "libc",
  "lset",
  "nbytes",
- "primordial",
+ "primordial 0.3.0",
  "rcrt1",
  "sallyport",
  "sgx",

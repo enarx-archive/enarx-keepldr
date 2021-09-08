@@ -18,7 +18,7 @@ sgx = { git = "https://github.com/enarx/sgx", rev = "2f8837a3e27d787ad4d420c588b
 goblin = { version = "0.4", default-features = false, features = [ "elf64" ] }
 crt0stack = { version = "0.1", default-features = false }
 libc = { version = "0.2", default-features = false }
-primordial = "0.1"
+primordial = "0.3"
 nbytes = "0.1"
 lset = "0.1"
 xsave = "0.1.1"
