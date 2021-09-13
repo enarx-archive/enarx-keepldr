@@ -203,7 +203,7 @@ checksum = "e4c2dbd44eb8b53973357e6e207e370f0c1059990df850aca1eca8947cf464f0"
 [[package]]
 name = "x86_64"
 version = "0.14.4"
-source = "git+https://github.com/npmccallum/x86_64?branch=errors#502ba0c17b1feeb152390a91664d9ee939943071"
+source = "git+https://github.com/npmccallum/x86_64?branch=errors#137f55571334e16bbe3e2b15eec2cb325817beef"
 dependencies = [
  "bit_field",
  "bitflags",
