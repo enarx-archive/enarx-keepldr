@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-//! This crate provides the `enarx-keepldr` executable which loads `static-pie`
+//! This file provides the `enarx-keepldr` executable which loads `static-pie`
 //! binaries into an Enarx Keep - that is a hardware isolated environment using
 //! technologies such as Intel SGX or AMD SEV.
 //!
@@ -53,18 +53,10 @@
 //!     $ cargo build --features=backend-sgx,backend-kvm
 
 #![deny(clippy::all)]
-#![deny(missing_docs)]
 #![feature(asm)]
 
-mod backend;
-mod binary;
-mod protobuf;
-
-// workaround for sallyport tests, until we have internal crates
-pub use sallyport::Request;
-
-use backend::{Backend, Command};
-use binary::Component;
+use enarx_keepldr::backend::{Backend, Command};
+use enarx_keepldr::binary::Component;
 
 use anyhow::Result;
 use structopt::StructOpt;
@@ -96,9 +88,9 @@ enum Options {
 fn main() -> Result<()> {
     let backends: &[Box<dyn Backend>] = &[
         #[cfg(feature = "backend-sgx")]
-        Box::new(backend::sgx::Backend),
+        Box::new(enarx_keepldr::backend::sgx::Backend),
         #[cfg(feature = "backend-kvm")]
-        Box::new(backend::kvm::Backend),
+        Box::new(enarx_keepldr::backend::kvm::Backend),
     ];
 
     match Options::from_args() {

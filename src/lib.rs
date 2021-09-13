@@ -1,0 +1,66 @@
+// SPDX-License-Identifier: Apache-2.0
+
+//! This crate provides the `enarx-keepldr` library and binary which
+//! loads `static-pie` binaries into an Enarx Keep - that is a hardware
+//! isolated environment using technologies such as Intel SGX or AMD SEV.
+//!
+//! # Building
+//!
+//! Please see **BUILD.md** for instructions.
+//!
+//! # Run Tests
+//!
+//!     $ cargo test
+//!
+//! # Build and Run an Application
+//!
+//!     $ cat > test.c <<EOF
+//!     #include <stdio.h>
+//!
+//!     int main() {
+//!         printf("Hello World!\n");
+//!         return 0;
+//!     }
+//!     EOF
+//!
+//!     $ musl-gcc -static-pie -fPIC -o test test.c
+//!     $ target/debug/enarx-keepldr exec ./test
+//!     Hello World!
+//!
+//! # Select a Different Backend
+//!
+//! `enarx-keepldr exec` will probe the machine it is running on
+//! in an attempt to deduce an appropriate deployment backend unless
+//! that target is already specified in an environment variable
+//! called `ENARX_BACKEND`.
+//!
+//! To see what backends are supported on your system, run:
+//!
+//!     $ target/debug/enarx-keepldr info
+//!
+//! To manually select a backend, set the `ENARX_BACKEND` environment
+//! variable:
+//!
+//!     $ ENARX_BACKEND=sgx target/debug/enarx-keepldr exec ./test
+//!
+//! Note that some backends are conditionally compiled. They can all
+//! be compiled in like so:
+//!
+//!     $ cargo build --all-features
+//!
+//! Or specific backends can be compiled in:
+//!
+//!     $ cargo build --features=backend-sgx,backend-kvm
+
+#![deny(clippy::all)]
+#![feature(asm)]
+
+// FIXME: write docs and change this back to `deny`!
+#![allow(missing_docs)]
+
+pub mod backend;
+pub mod binary;
+pub mod protobuf;
+
+// workaround for sallyport tests, until we have internal crates
+pub use sallyport::Request;
