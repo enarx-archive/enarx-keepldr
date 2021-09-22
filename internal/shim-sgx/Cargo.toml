@@ -21,7 +21,7 @@ libc = { version = "0.2", default-features = false }
 const-default = "0.1"
 primordial = "0.3.0"
 flagset = "0.4"
-xsave = "0.1.1"
+xsave = "1.0.0"
 nbytes = "0.1"
 noted = "0.1"
 lset = "0.2"
