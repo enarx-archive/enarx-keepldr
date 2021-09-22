@@ -20,7 +20,7 @@ spinning = { version = "0.1", default-features = false }
 libc = { version = "0.2", default-features = false }
 primordial = "0.3"
 nbytes = "0.1"
-noted = "0.1"
+noted = "1.0"
 lset = "0.2"
 array-const-fn-init = "0.1"
 linked_list_allocator = { version = "0.9.0", default-features = false }
