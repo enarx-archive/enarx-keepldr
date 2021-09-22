@@ -15,7 +15,7 @@ enarx-heap = { git = "https://github.com/enarx/enarx-heap", rev = "9cbfb3367edd4
 rcrt1 = { git = "https://github.com/enarx/rcrt1", rev = "b28f711" }
 compiler_builtins = { version = "0.1", default-features = false, features = [ "mem" ] }
 goblin = { version = "0.4", default-features = false, features = [ "elf64" ] }
-x86_64 = { version = "^0.14.5", default-features = false }
+x86_64 = { version = "^0.14.6", default-features = false }
 crt0stack = { version = "0.1", default-features = false }
 libc = { version = "0.2", default-features = false }
 const-default = "0.1"
