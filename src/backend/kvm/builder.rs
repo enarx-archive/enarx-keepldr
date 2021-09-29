@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::mem::Region;
+use crate::backend::kvm::KvmKeepPersonality;
 use anyhow::{Error, Result};
 use kvm_bindings::bindings::kvm_userspace_memory_region;
 use kvm_bindings::fam_wrappers::KVM_MAX_CPUID_ENTRIES;
@@ -93,13 +94,14 @@ impl TryFrom<Builder> for Arc<dyn super::super::Keep> {
         // unwrap, because we have at least one block
         let sallyport_block_start = builder.sallyports.first().unwrap().unwrap();
 
-        Ok(Arc::new(RwLock::new(super::Keep {
+        Ok(Arc::new(RwLock::new(super::Keep::<KvmKeepPersonality> {
             kvm_fd: builder.kvm_fd,
             vm_fd: builder.vm_fd,
             cpu_fds: vec![vcpu_fd],
             regions: builder.regions,
             sallyports: builder.sallyports,
             sallyport_start: sallyport_block_start,
+            personality: KvmKeepPersonality(()),
         })))
     }
 }

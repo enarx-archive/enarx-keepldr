@@ -161,6 +161,7 @@ dependencies = [
  "cc",
  "ciborium",
  "colorful",
+ "const-default",
  "goblin 0.4.3",
  "iocuddle",
  "itertools",
@@ -179,6 +180,7 @@ dependencies = [
  "sallyport",
  "semver",
  "serial_test",
+ "sev 0.1.0 (git+https://github.com/enarx/sev?rev=e0e17aac9249b00b0cb3e24a2780ca814d229a11)",
  "sgx",
  "structopt",
  "tempdir",
@@ -295,7 +297,7 @@ version = "0.1.0"
 source = "git+https://github.com/enarx/koine#8a03e3eb18e4d70a59b9e9c5d16e8f044050baa4"
 dependencies = [
  "serde",
- "sev",
+ "sev 0.1.0 (git+https://github.com/enarx/sev)",
  "uuid",
 ]
 
@@ -688,6 +690,20 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "sev"
+version = "0.1.0"
+source = "git+https://github.com/enarx/sev?rev=e0e17aac9249b00b0cb3e24a2780ca814d229a11#e0e17aac9249b00b0cb3e24a2780ca814d229a11"
+dependencies = [
+ "bitfield",
+ "bitflags",
+ "codicon",
+ "dirs",
+ "iocuddle",
+ "serde",
+ "serde_bytes",
 ]
 
 [[package]]
