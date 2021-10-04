@@ -1,4 +1,5 @@
 [toolchain]
-channel = "nightly"
+# Pinned until https://github.com/rust-lang/rust/issues/89432 is fixed
+channel = "nightly-2021-09-30"
 targets = ["x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl"]
 profile = "minimal"
