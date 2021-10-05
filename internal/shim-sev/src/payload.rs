@@ -6,7 +6,7 @@ use crate::allocator::ALLOCATOR;
 use crate::random::random;
 use crate::shim_stack::init_stack_with_guard;
 use crate::usermode::usermode;
-use crate::PAYLOAD_READY;
+use crate::{get_cbit_mask, PAYLOAD_READY, _ENARX_CPUID};
 
 use core::convert::TryFrom;
 use core::sync::atomic::Ordering;
@@ -125,7 +125,18 @@ fn crt0setup(
     let ph_header = app_virt_start + header.e_phoff;
     let ph_entry = app_virt_start + header.e_entry;
 
-    let hwcap = unsafe { core::arch::x86_64::__cpuid(1) }.edx;
+    let hwcap = if get_cbit_mask() == 0 {
+        unsafe { core::arch::x86_64::__cpuid(1) }.edx
+    } else {
+        let cpuid = &unsafe { _ENARX_CPUID };
+        cpuid
+            .get_functions()
+            .iter()
+            .find(|e| e.eax_in == 1 && e.ecx_in == 0)
+            .map(|ent| ent.edx)
+            .unwrap()
+    };
+
     let rand = unsafe { core::mem::transmute([random(), random()]) };
 
     for aux in &[
